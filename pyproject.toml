@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bud"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "asyncpg>=0.31.0",
+    "click>=8.3.1",
+    "fastapi>=0.129.0",
+    "sqlalchemy>=2.0.46",
+    "uvicorn[standard]>=0.41.0",
+]
+
+[project.scripts]
+bud = "bud.cli:cli"
+
+[dependency-groups]
+dev = []
