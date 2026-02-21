@@ -1,4 +1,4 @@
-.PHONY: venv setup build test watch lint clean
+.PHONY: venv setup install build test watch lint clean
 
 PYTHON := python3
 UV := uv
@@ -8,6 +8,9 @@ venv:
 
 setup: venv
 	$(UV) sync
+
+install:
+	$(UV) tool install .
 
 build:
 	docker compose build
