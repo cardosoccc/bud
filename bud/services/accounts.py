@@ -29,6 +29,16 @@ async def list_accounts(db: AsyncSession, user_id: uuid.UUID, project_id: Option
     return list(result.scalars().all())
 
 
+async def get_account_by_name(db: AsyncSession, name: str, user_id: uuid.UUID, project_id: uuid.UUID) -> Optional[Account]:
+    result = await db.execute(
+        select(Account)
+        .join(project_accounts, Account.id == project_accounts.c.account_id)
+        .join(Project, project_accounts.c.project_id == Project.id)
+        .where(Account.name == name, Project.id == project_id, Project.user_id == user_id)
+    )
+    return result.scalar_one_or_none()
+
+
 async def get_account(db: AsyncSession, account_id: uuid.UUID) -> Optional[Account]:
     result = await db.execute(select(Account).where(Account.id == account_id))
     return result.scalar_one_or_none()

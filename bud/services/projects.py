@@ -16,6 +16,13 @@ async def list_projects(db: AsyncSession, user_id: uuid.UUID) -> List[Project]:
     return list(result.scalars().all())
 
 
+async def get_project_by_name(db: AsyncSession, name: str, user_id: uuid.UUID) -> Optional[Project]:
+    result = await db.execute(
+        select(Project).where(Project.name == name, Project.user_id == user_id)
+    )
+    return result.scalar_one_or_none()
+
+
 async def get_project(db: AsyncSession, project_id: uuid.UUID, user_id: uuid.UUID) -> Optional[Project]:
     result = await db.execute(
         select(Project).where(Project.id == project_id, Project.user_id == user_id)

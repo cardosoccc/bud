@@ -15,6 +15,13 @@ async def list_categories(db: AsyncSession, user_id: uuid.UUID) -> List[Category
     return list(result.scalars().all())
 
 
+async def get_category_by_name(db: AsyncSession, name: str, user_id: uuid.UUID) -> Optional[Category]:
+    result = await db.execute(
+        select(Category).where(Category.name == name, Category.user_id == user_id)
+    )
+    return result.scalar_one_or_none()
+
+
 async def get_category(db: AsyncSession, category_id: uuid.UUID, user_id: uuid.UUID) -> Optional[Category]:
     result = await db.execute(
         select(Category).where(Category.id == category_id, Category.user_id == user_id)
