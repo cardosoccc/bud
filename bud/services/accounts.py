@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional, List
 
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -46,7 +46,7 @@ async def create_account(db: AsyncSession, data: AccountCreate, user_id: uuid.UU
     account = Account(name=data.name, type=data.type)
     db.add(account)
     await db.flush()
-    project.accounts.append(account)
+    await db.execute(insert(project_accounts).values(project_id=project.id, account_id=account.id))
     await db.commit()
     await db.refresh(account)
     return account
