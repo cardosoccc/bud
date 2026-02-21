@@ -11,7 +11,7 @@ from bud.models.forecast import Forecast
 from bud.models.transaction import Transaction
 from bud.models.account import Account, AccountType
 from bud.models.project import project_accounts
-from bud.schemas.report import ReportRead, AccountBalance, ForecastActual
+from bud.schemas.report import ReportRead, AccountBalance, ForecastActual, TransactionItem
 
 
 async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
@@ -47,6 +47,9 @@ async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
     )
     transactions = list(txns_result.scalars().all())
 
+    # Build a map of all account ids to names (including nil accounts fetched later)
+    account_name_map: dict = {a.id: a.name for a in accounts}
+
     # Calculate account balances
     account_balances = []
     total_balance = Decimal("0")
@@ -79,7 +82,9 @@ async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
             Account.type == AccountType.nil,
         )
     )
-    nil_accounts = {a.id for a in nil_accts_result.scalars().all()}
+    nil_accts = list(nil_accts_result.scalars().all())
+    nil_accounts = {a.id for a in nil_accts}
+    account_name_map.update({a.id: a.name for a in nil_accts})
 
     for t in transactions:
         val = Decimal(str(t.value))
@@ -119,6 +124,20 @@ async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
             )
         )
 
+    # Build transaction items with account names resolved
+    transaction_items = [
+        TransactionItem(
+            id=t.id,
+            date=t.date,
+            description=t.description,
+            value=Decimal(str(t.value)),
+            source_account=account_name_map.get(t.source_account_id, str(t.source_account_id)),
+            destination_account=account_name_map.get(t.destination_account_id, str(t.destination_account_id)),
+            category_id=t.category_id,
+        )
+        for t in transactions
+    ]
+
     # For future budgets, calculate projected net balance by summing
     # net forecast values for all budgets from the earliest future month
     # up to and including this budget month
@@ -138,6 +157,7 @@ async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
         total_earnings=total_earnings,
         total_expenses=total_expenses,
         forecasts=forecast_actuals,
+        transactions=transaction_items,
         is_projected=is_projected,
         projected_net_balance=projected_net_balance,
     )

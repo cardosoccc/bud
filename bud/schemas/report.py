@@ -21,6 +21,16 @@ class ForecastActual(BaseModel):
     category_id: Optional[uuid.UUID] = None
 
 
+class TransactionItem(BaseModel):
+    id: uuid.UUID
+    date: date
+    description: str
+    value: Decimal
+    source_account: str
+    destination_account: str
+    category_id: Optional[uuid.UUID] = None
+
+
 class ReportRead(BaseModel):
     budget_id: uuid.UUID
     budget_name: str
@@ -31,5 +41,6 @@ class ReportRead(BaseModel):
     total_earnings: Decimal
     total_expenses: Decimal
     forecasts: List[ForecastActual]
+    transactions: List[TransactionItem] = []
     is_projected: bool = False
     projected_net_balance: Optional[Decimal] = None

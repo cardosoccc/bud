@@ -17,7 +17,8 @@ def report():
 @report.command("show")
 @click.argument("budget_id", required=False, default=None)
 @click.option("--project", "project_id", default=None, help="Project name or ID.")
-def show_report(budget_id, project_id):
+@click.option("--transactions", "show_transactions", is_flag=True, default=False, help="Include all transactions in the report.")
+def show_report(budget_id, project_id, show_transactions):
     """Show a budget report.
 
     BUDGET_ID can be a UUID or a budget name (YYYY-MM). If omitted, defaults
@@ -48,22 +49,41 @@ def show_report(budget_id, project_id):
                 click.echo(f"Error: {e}", err=True)
                 return
 
-            click.echo(f"\nBudget: {r.budget_name}  ({r.start_date} - {r.end_date})")
-            click.echo(f"Total Balance:   {r.total_balance:>12.2f}")
-            click.echo(f"Total Earnings:  {r.total_earnings:>12.2f}")
-            click.echo(f"Total Expenses:  {r.total_expenses:>12.2f}")
+            # Budget name as H1
+            click.echo(f"# {r.budget_name}")
+            click.echo(f"\n_{r.start_date} - {r.end_date}_")
+
+            # Summary table: balance, earnings, expenses
+            summary_rows = [
+                ["Balance", f"{r.total_balance:.2f}"],
+                ["Earnings", f"{r.total_earnings:.2f}"],
+                ["Expenses", f"{r.total_expenses:.2f}"],
+            ]
+            click.echo()
+            click.echo(tabulate(summary_rows, headers=["", "Amount"], tablefmt="github"))
 
             if r.account_balances:
-                click.echo("\nAccount Balances:")
-                rows = [[b.account_name, b.balance] for b in r.account_balances]
-                click.echo(tabulate(rows, headers=["Account", "Balance"], tablefmt="psql", floatfmt=".2f"))
+                click.echo("\n## Account Balances\n")
+                rows = [[b.account_name, f"{b.balance:.2f}"] for b in r.account_balances]
+                click.echo(tabulate(rows, headers=["Account", "Balance"], tablefmt="github"))
 
             if r.forecasts:
-                click.echo("\nForecasts vs Actuals:")
+                click.echo("\n## Forecasts vs Actuals\n")
                 rows = [
-                    [f.description, f.forecast_value, f.actual_value, f.difference]
+                    [f.description, f"{f.forecast_value:.2f}", f"{f.actual_value:.2f}", f"{f.difference:.2f}"]
                     for f in r.forecasts
                 ]
-                click.echo(tabulate(rows, headers=["Description", "Forecast", "Actual", "Difference"], tablefmt="psql", floatfmt=".2f"))
+                click.echo(tabulate(rows, headers=["Description", "Forecast", "Actual", "Difference"], tablefmt="github"))
+
+            if show_transactions:
+                click.echo("\n## Transactions\n")
+                if r.transactions:
+                    rows = [
+                        [str(t.date), t.description, f"{t.value:.2f}", t.source_account, t.destination_account]
+                        for t in r.transactions
+                    ]
+                    click.echo(tabulate(rows, headers=["Date", "Description", "Amount", "From", "To"], tablefmt="github"))
+                else:
+                    click.echo("_No transactions found._")
 
     run_async(_run())
