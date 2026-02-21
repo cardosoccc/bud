@@ -39,7 +39,7 @@ def list_transactions(month, project_id):
                 [str(t.id)[:8], t.date, t.description, str(t.value), str(t.source_account_id)[:8], str(t.destination_account_id)[:8]]
                 for t in items
             ]
-            click.echo(tabulate(rows, headers=["ID", "Date", "Description", "Value", "From", "To"]))
+            click.echo(tabulate(rows, headers=["ID", "Date", "Description", "Value", "From", "To"], tablefmt="postgres"))
 
     run_async(_run())
 
