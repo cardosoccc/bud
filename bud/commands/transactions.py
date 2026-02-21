@@ -5,7 +5,7 @@ from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
 from bud.commands.utils import (
-    require_user_id, resolve_project_id, resolve_account_id, resolve_category_id
+    require_user_id, resolve_project_id, resolve_account_id, resolve_category_id, is_uuid
 )
 from bud.schemas.transaction import TransactionCreate, TransactionUpdate
 from bud.services import transactions as transaction_service
@@ -102,8 +102,17 @@ def create_transaction(value, description, txn_date, source_id, dest_id, project
             if category_id:
                 cat = await resolve_category_id(db, category_id, user_id)
                 if not cat:
-                    click.echo(f"Category not found: {category_id}", err=True)
-                    return
+                    if is_uuid(category_id):
+                        click.echo(f"Category not found: {category_id}", err=True)
+                        return
+                    if click.confirm(f"Category '{category_id}' not found. Create it?", default=False):
+                        from bud.schemas.category import CategoryCreate
+                        from bud.services import categories as category_service
+                        new_cat = await category_service.create_category(db, CategoryCreate(name=category_id), user_id)
+                        cat = new_cat.id
+                        click.echo(f"Created category: {new_cat.name}")
+                    else:
+                        return
 
             t = await transaction_service.create_transaction(db, TransactionCreate(
                 value=value,
@@ -139,8 +148,17 @@ def edit_transaction(transaction_id, value, description, txn_date, category_id, 
             if category_id:
                 cat = await resolve_category_id(db, category_id, user_id)
                 if not cat:
-                    click.echo(f"Category not found: {category_id}", err=True)
-                    return
+                    if is_uuid(category_id):
+                        click.echo(f"Category not found: {category_id}", err=True)
+                        return
+                    if click.confirm(f"Category '{category_id}' not found. Create it?", default=False):
+                        from bud.schemas.category import CategoryCreate
+                        from bud.services import categories as category_service
+                        new_cat = await category_service.create_category(db, CategoryCreate(name=category_id), user_id)
+                        cat = new_cat.id
+                        click.echo(f"Created category: {new_cat.name}")
+                    else:
+                        return
 
             t = await transaction_service.update_transaction(db, uuid.UUID(transaction_id), TransactionUpdate(
                 value=value,
