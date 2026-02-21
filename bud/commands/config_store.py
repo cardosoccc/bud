@@ -1,12 +1,13 @@
 """CLI configuration storage in ~/.bud/config.json."""
 import json
-import os
 from pathlib import Path
 from typing import Optional
 
 
 CONFIG_DIR = Path.home() / ".bud"
 CONFIG_FILE = CONFIG_DIR / "config.json"
+DB_PATH = CONFIG_DIR / "bud.db"
+DB_URL = f"sqlite+aiosqlite:///{DB_PATH}"
 
 
 def load_config() -> dict:
@@ -45,8 +46,4 @@ def get_default_project_id() -> Optional[str]:
 
 
 def get_db_url() -> str:
-    from bud.config import settings
-    return get_config_value(
-        "db_url",
-        os.getenv("DATABASE_URL", settings.database_url),
-    )
+    return DB_URL

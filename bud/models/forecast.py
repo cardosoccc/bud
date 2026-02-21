@@ -3,8 +3,7 @@ from datetime import date, datetime
 from typing import Optional
 from decimal import Decimal
 
-from sqlalchemy import String, Numeric, ForeignKey, Date, DateTime, func, JSON, Boolean
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import String, Numeric, ForeignKey, Date, DateTime, Uuid, func, JSON, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from bud.database import Base
@@ -13,7 +12,7 @@ from bud.database import Base
 class Forecast(Base):
     __tablename__ = "forecasts"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     description: Mapped[str] = mapped_column(String(500), nullable=False)
     value: Mapped[Decimal] = mapped_column(Numeric(precision=15, scale=2), nullable=False)
     min_value: Mapped[Optional[Decimal]] = mapped_column(Numeric(precision=15, scale=2), nullable=True)
@@ -24,10 +23,10 @@ class Forecast(Base):
     recurrent_end: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 
     budget_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("budgets.id", ondelete="CASCADE"), nullable=False
+        Uuid, ForeignKey("budgets.id", ondelete="CASCADE"), nullable=False
     )
     category_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("categories.id", ondelete="SET NULL"), nullable=True
+        Uuid, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
