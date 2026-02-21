@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: bud
+      POSTGRES_PASSWORD: bud
+      POSTGRES_DB: bud
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bud"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://bud:bud@db/bud
+      SECRET_KEY: change-me-in-production
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
