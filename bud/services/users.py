@@ -41,30 +41,6 @@ async def get_user_by_email(db: AsyncSession, email: str) -> Optional[User]:
     return result.scalar_one_or_none()
 
 
-async def get_user_by_google_id(db: AsyncSession, google_id: str) -> Optional[User]:
-    result = await db.execute(select(User).where(User.google_id == google_id))
-    return result.scalar_one_or_none()
-
-
-async def create_or_update_google_user(db: AsyncSession, google_info: dict) -> User:
-    google_id = google_info["id"]
-    email = google_info["email"]
-    name = google_info.get("name", email)
-
-    user = await get_user_by_google_id(db, google_id)
-    if user:
-        return user
-
-    user = await get_user_by_email(db, email)
-    if user:
-        user.google_id = google_id
-        await db.commit()
-        await db.refresh(user)
-        return user
-
-    return await create_user(db, UserCreate(email=email, name=name))
-
-
 async def update_user(db: AsyncSession, user_id: uuid.UUID, data: UserUpdate) -> Optional[User]:
     user = await get_user(db, user_id)
     if not user:

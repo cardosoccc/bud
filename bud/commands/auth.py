@@ -1,11 +1,10 @@
-import asyncio
 import click
 
 from bud.commands.config_store import load_config, save_config, set_config_value, get_user_id
 from bud.commands.db import get_session, run_async
 from bud.services import users as user_service
 from bud.schemas.user import UserCreate
-from bud.auth import verify_password, get_google_auth_url, exchange_google_code
+from bud.auth import verify_password
 
 
 @click.group()
@@ -28,6 +27,7 @@ def register(email, name, password):
                 return
             user = await user_service.create_user(db, UserCreate(email=email, name=name, password=password or None))
             set_config_value("user_id", str(user.id))
+            set_config_value("default_project_id", str(user.projects[0].id) if user.projects else None)
             click.echo(f"Registered and logged in as {user.email} (id: {user.id})")
 
     run_async(_run())
@@ -47,32 +47,6 @@ def login(email, password):
             if not verify_password(password, user.hashed_password):
                 click.echo("Error: invalid credentials.", err=True)
                 return
-            set_config_value("user_id", str(user.id))
-            click.echo(f"Logged in as {user.email}")
-
-    run_async(_run())
-
-
-@auth.command("login-google")
-def login_google():
-    """Log in with Google OAuth."""
-    from bud.config import settings
-    if not settings.google_client_id:
-        click.echo("Error: GOOGLE_CLIENT_ID not configured.", err=True)
-        return
-
-    url = get_google_auth_url()
-    click.echo(f"Open this URL in your browser:\n{url}")
-    code = click.prompt("Paste the authorization code")
-
-    async def _run():
-        async with get_session() as db:
-            try:
-                google_info = await exchange_google_code(code)
-            except Exception as e:
-                click.echo(f"Error: failed to exchange code: {e}", err=True)
-                return
-            user = await user_service.create_or_update_google_user(db, google_info)
             set_config_value("user_id", str(user.id))
             click.echo(f"Logged in as {user.email}")
 

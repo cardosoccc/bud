@@ -2,8 +2,7 @@ import uuid
 import enum
 from typing import Optional
 
-from sqlalchemy import String, Enum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import String, Enum, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from bud.database import Base
@@ -18,7 +17,7 @@ class AccountType(str, enum.Enum):
 class Account(Base):
     __tablename__ = "accounts"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     type: Mapped[AccountType] = mapped_column(Enum(AccountType), nullable=False, default=AccountType.debit)
 
