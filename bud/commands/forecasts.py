@@ -37,8 +37,8 @@ def list_forecasts(budget_id, project_id):
             if not items:
                 click.echo("No forecasts found.")
                 return
-            rows = [[str(f.id)[:8], f.description, str(f.value), "Yes" if f.is_recurrent else ""] for f in items]
-            click.echo(tabulate(rows, headers=["ID", "Description", "Value", "Recurrent"], tablefmt="psql"))
+            rows = [[str(f.id)[:8], f.description, f.value, "Yes" if f.is_recurrent else ""] for f in items]
+            click.echo(tabulate(rows, headers=["ID", "Description", "Value", "Recurrent"], tablefmt="psql", floatfmt=".2f"))
 
     run_async(_run())
 
