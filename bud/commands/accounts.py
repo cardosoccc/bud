@@ -31,7 +31,7 @@ def list_accounts(project_id):
                 click.echo("No accounts found.")
                 return
             rows = [[str(a.id), a.name, a.type.value] for a in items]
-            click.echo(tabulate(rows, headers=["ID", "Name", "Type"]))
+            click.echo(tabulate(rows, headers=["ID", "Name", "Type"], tablefmt="psql"))
 
     run_async(_run())
 

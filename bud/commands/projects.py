@@ -25,7 +25,7 @@ def list_projects():
                 click.echo("No projects found.")
                 return
             rows = [[str(p.id), p.name, "Yes" if p.is_default else ""] for p in items]
-            click.echo(tabulate(rows, headers=["ID", "Name", "Default"]))
+            click.echo(tabulate(rows, headers=["ID", "Name", "Default"], tablefmt="psql"))
 
     run_async(_run())
 

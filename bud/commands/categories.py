@@ -24,7 +24,7 @@ def list_categories():
                 click.echo("No categories found.")
                 return
             rows = [[str(c.id), c.name] for c in items]
-            click.echo(tabulate(rows, headers=["ID", "Name"]))
+            click.echo(tabulate(rows, headers=["ID", "Name"], tablefmt="psql"))
 
     run_async(_run())
 

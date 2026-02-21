@@ -29,7 +29,7 @@ def list_budgets(project_id):
                 click.echo("No budgets found.")
                 return
             rows = [[str(b.id), b.name, str(b.start_date), str(b.end_date)] for b in items]
-            click.echo(tabulate(rows, headers=["ID", "Month", "Start", "End"]))
+            click.echo(tabulate(rows, headers=["ID", "Month", "Start", "End"], tablefmt="psql"))
 
     run_async(_run())
 
