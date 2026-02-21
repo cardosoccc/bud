@@ -31,3 +31,5 @@ class ReportRead(BaseModel):
     total_earnings: Decimal
     total_expenses: Decimal
     forecasts: List[ForecastActual]
+    is_projected: bool = False
+    projected_net_balance: Optional[Decimal] = None
