@@ -2,6 +2,7 @@ import uuid
 from typing import Optional
 
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bud.models.user import User
@@ -27,8 +28,10 @@ async def create_user(db: AsyncSession, data: UserCreate) -> User:
     db.add(default_project)
 
     await db.commit()
-    await db.refresh(user)
-    return user
+    result = await db.execute(
+        select(User).where(User.id == user.id).options(selectinload(User.projects))
+    )
+    return result.scalar_one()
 
 
 async def get_user(db: AsyncSession, user_id: uuid.UUID) -> Optional[User]:

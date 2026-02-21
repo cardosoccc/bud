@@ -56,7 +56,7 @@ def show_report(budget_id, project_id):
             if r.account_balances:
                 click.echo("\nAccount Balances:")
                 rows = [[b.account_name, f"{b.balance:.2f}"] for b in r.account_balances]
-                click.echo(tabulate(rows, headers=["Account", "Balance"], tablefmt="postgres"))
+                click.echo(tabulate(rows, headers=["Account", "Balance"], tablefmt="psql"))
 
             if r.forecasts:
                 click.echo("\nForecasts vs Actuals:")
@@ -64,6 +64,6 @@ def show_report(budget_id, project_id):
                     [f.description, f"{f.forecast_value:.2f}", f"{f.actual_value:.2f}", f"{f.difference:.2f}"]
                     for f in r.forecasts
                 ]
-                click.echo(tabulate(rows, headers=["Description", "Forecast", "Actual", "Difference"], tablefmt="postgres"))
+                click.echo(tabulate(rows, headers=["Description", "Forecast", "Actual", "Difference"], tablefmt="psql"))
 
     run_async(_run())
