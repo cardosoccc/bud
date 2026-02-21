@@ -1,9 +1,8 @@
-import uuid
 import click
 from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
-from bud.commands.utils import require_user_id
+from bud.commands.utils import require_user_id, resolve_category_id
 from bud.schemas.category import CategoryCreate, CategoryUpdate
 from bud.services import categories as category_service
 
@@ -47,11 +46,15 @@ def create_category(name):
 @click.argument("category_id")
 @click.option("--name", required=True)
 def edit_category(category_id, name):
-    """Edit a category."""
+    """Edit a category. CATEGORY_ID can be a UUID or category name."""
     async def _run():
         user_id = require_user_id()
         async with get_session() as db:
-            c = await category_service.update_category(db, uuid.UUID(category_id), user_id, CategoryUpdate(name=name))
+            cid = await resolve_category_id(db, category_id, user_id)
+            if not cid:
+                click.echo(f"Category not found: {category_id}", err=True)
+                return
+            c = await category_service.update_category(db, cid, user_id, CategoryUpdate(name=name))
             if not c:
                 click.echo("Category not found.", err=True)
                 return
@@ -64,11 +67,15 @@ def edit_category(category_id, name):
 @click.argument("category_id")
 @click.confirmation_option(prompt="Delete this category?")
 def delete_category(category_id):
-    """Delete a category."""
+    """Delete a category. CATEGORY_ID can be a UUID or category name."""
     async def _run():
         user_id = require_user_id()
         async with get_session() as db:
-            ok = await category_service.delete_category(db, uuid.UUID(category_id), user_id)
+            cid = await resolve_category_id(db, category_id, user_id)
+            if not cid:
+                click.echo(f"Category not found: {category_id}", err=True)
+                return
+            ok = await category_service.delete_category(db, cid, user_id)
             if not ok:
                 click.echo("Category not found.", err=True)
                 return

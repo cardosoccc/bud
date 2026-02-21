@@ -4,7 +4,9 @@ import click
 from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
-from bud.commands.utils import require_user_id, require_project_id, require_month
+from bud.commands.utils import (
+    require_user_id, resolve_project_id, resolve_account_id, resolve_category_id
+)
 from bud.schemas.transaction import TransactionCreate, TransactionUpdate
 from bud.services import transactions as transaction_service
 
@@ -17,14 +19,18 @@ def transaction():
 
 @transaction.command("list")
 @click.option("--month", default=None, help="YYYY-MM")
-@click.option("--project", "project_id", default=None)
+@click.option("--project", "project_id", default=None, help="Project UUID or name")
 def list_transactions(month, project_id):
     """List transactions for a given month."""
     async def _run():
         user_id = require_user_id()
-        pid = require_project_id(project_id)
-        m = require_month(month)
         async with get_session() as db:
+            pid = await resolve_project_id(db, project_id, user_id)
+            if not pid:
+                click.echo("Error: no project specified. Use --project or set a default with `bud project set-default`.", err=True)
+                return
+            from bud.commands.utils import require_month
+            m = require_month(month)
             items = await transaction_service.list_transactions(db, user_id, pid, m)
             if not items:
                 click.echo("No transactions found.")
@@ -64,28 +70,49 @@ def show_transaction(transaction_id):
 @click.option("--value", required=True, type=float)
 @click.option("--description", required=True)
 @click.option("--date", "txn_date", default=None, help="YYYY-MM-DD (default: today)")
-@click.option("--from", "source_id", required=True, help="Source account ID")
-@click.option("--to", "dest_id", required=True, help="Destination account ID")
-@click.option("--project", "project_id", default=None)
-@click.option("--category", "category_id", default=None)
+@click.option("--from", "source_id", required=True, help="Source account UUID or name")
+@click.option("--to", "dest_id", required=True, help="Destination account UUID or name")
+@click.option("--project", "project_id", default=None, help="Project UUID or name")
+@click.option("--category", "category_id", default=None, help="Category UUID or name")
 @click.option("--tags", default=None, help="Comma-separated tags")
 def create_transaction(value, description, txn_date, source_id, dest_id, project_id, category_id, tags):
     """Create a new transaction."""
     async def _run():
         user_id = require_user_id()
-        pid = require_project_id(project_id)
         d = date_type.fromisoformat(txn_date) if txn_date else date_type.today()
         tag_list = [t.strip() for t in tags.split(",")] if tags else []
 
         async with get_session() as db:
+            pid = await resolve_project_id(db, project_id, user_id)
+            if not pid:
+                click.echo("Error: no project specified. Use --project or set a default with `bud project set-default`.", err=True)
+                return
+
+            src = await resolve_account_id(db, source_id, user_id, pid)
+            if not src:
+                click.echo(f"Source account not found: {source_id}", err=True)
+                return
+
+            dst = await resolve_account_id(db, dest_id, user_id, pid)
+            if not dst:
+                click.echo(f"Destination account not found: {dest_id}", err=True)
+                return
+
+            cat = None
+            if category_id:
+                cat = await resolve_category_id(db, category_id, user_id)
+                if not cat:
+                    click.echo(f"Category not found: {category_id}", err=True)
+                    return
+
             t = await transaction_service.create_transaction(db, TransactionCreate(
                 value=value,
                 description=description,
                 date=d,
-                source_account_id=uuid.UUID(source_id),
-                destination_account_id=uuid.UUID(dest_id),
+                source_account_id=src,
+                destination_account_id=dst,
                 project_id=pid,
-                category_id=uuid.UUID(category_id) if category_id else None,
+                category_id=cat,
                 tags=tag_list,
             ))
             click.echo(f"Created transaction: {t.description} ({t.value}) id: {t.id}")
@@ -98,19 +125,28 @@ def create_transaction(value, description, txn_date, source_id, dest_id, project
 @click.option("--value", type=float, default=None)
 @click.option("--description", default=None)
 @click.option("--date", "txn_date", default=None)
-@click.option("--category", "category_id", default=None)
+@click.option("--category", "category_id", default=None, help="Category UUID or name")
 @click.option("--tags", default=None, help="Comma-separated tags")
 def edit_transaction(transaction_id, value, description, txn_date, category_id, tags):
     """Edit a transaction."""
     async def _run():
+        user_id = require_user_id()
         async with get_session() as db:
             d = date_type.fromisoformat(txn_date) if txn_date else None
             tag_list = [t.strip() for t in tags.split(",")] if tags else None
+
+            cat = None
+            if category_id:
+                cat = await resolve_category_id(db, category_id, user_id)
+                if not cat:
+                    click.echo(f"Category not found: {category_id}", err=True)
+                    return
+
             t = await transaction_service.update_transaction(db, uuid.UUID(transaction_id), TransactionUpdate(
                 value=value,
                 description=description,
                 date=d,
-                category_id=uuid.UUID(category_id) if category_id else None,
+                category_id=cat,
                 tags=tag_list,
             ))
             if not t:
