@@ -53,6 +53,10 @@ async def create_account(db: AsyncSession, data: AccountCreate, user_id: uuid.UU
     if not project:
         raise ValueError("Project not found")
 
+    existing = await get_account_by_name(db, data.name, user_id, data.project_id)
+    if existing:
+        raise ValueError(f"Account '{data.name}' already exists in this project")
+
     account = Account(name=data.name, type=data.type)
     db.add(account)
     await db.flush()

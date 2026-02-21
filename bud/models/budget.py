@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import String, ForeignKey, Date, DateTime, Uuid, func
+from sqlalchemy import String, ForeignKey, Date, DateTime, Uuid, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from bud.database import Base
@@ -9,6 +9,7 @@ from bud.database import Base
 
 class Budget(Base):
     __tablename__ = "budgets"
+    __table_args__ = (UniqueConstraint("name", "project_id", name="uq_budgets_name_project"),)
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(7), nullable=False)  # YYYY-MM
