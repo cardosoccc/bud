@@ -5,6 +5,7 @@ from typing import Optional, List
 
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from bud.models.transaction import Transaction
 from bud.schemas.transaction import TransactionCreate, TransactionUpdate
@@ -31,13 +32,26 @@ async def list_transactions(
         conditions.append(Transaction.date < end)
 
     result = await db.execute(
-        select(Transaction).where(and_(*conditions)).order_by(Transaction.date.desc())
+        select(Transaction)
+        .options(
+            selectinload(Transaction.source_account),
+            selectinload(Transaction.destination_account),
+        )
+        .where(and_(*conditions))
+        .order_by(Transaction.date.desc())
     )
     return list(result.scalars().all())
 
 
 async def get_transaction(db: AsyncSession, transaction_id: uuid.UUID) -> Optional[Transaction]:
-    result = await db.execute(select(Transaction).where(Transaction.id == transaction_id))
+    result = await db.execute(
+        select(Transaction)
+        .options(
+            selectinload(Transaction.source_account),
+            selectinload(Transaction.destination_account),
+        )
+        .where(Transaction.id == transaction_id)
+    )
     return result.scalar_one_or_none()
 
 
