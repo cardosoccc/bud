@@ -2,7 +2,7 @@ import click
 from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
-from bud.commands.utils import require_user_id, resolve_project_id
+from bud.commands.utils import resolve_project_id
 from bud.commands.config_store import set_config_value
 from bud.schemas.project import ProjectCreate, ProjectUpdate
 from bud.services import projects as project_service
@@ -18,9 +18,8 @@ def project():
 def list_projects():
     """List all projects."""
     async def _run():
-        user_id = require_user_id()
         async with get_session() as db:
-            items = await project_service.list_projects(db, user_id)
+            items = await project_service.list_projects(db)
             if not items:
                 click.echo("No projects found.")
                 return
@@ -35,9 +34,8 @@ def list_projects():
 def create_project(name):
     """Create a new project."""
     async def _run():
-        user_id = require_user_id()
         async with get_session() as db:
-            p = await project_service.create_project(db, ProjectCreate(name=name), user_id)
+            p = await project_service.create_project(db, ProjectCreate(name=name))
             click.echo(f"Created project: {p.name} (id: {p.id})")
 
     run_async(_run())
@@ -49,13 +47,12 @@ def create_project(name):
 def edit_project(project_id, name):
     """Edit a project. PROJECT_ID can be a UUID or project name."""
     async def _run():
-        user_id = require_user_id()
         async with get_session() as db:
-            pid = await resolve_project_id(db, project_id, user_id)
+            pid = await resolve_project_id(db, project_id)
             if not pid:
                 click.echo(f"Project not found: {project_id}", err=True)
                 return
-            p = await project_service.update_project(db, pid, user_id, ProjectUpdate(name=name))
+            p = await project_service.update_project(db, pid, ProjectUpdate(name=name))
             if not p:
                 click.echo("Project not found.", err=True)
                 return
@@ -70,13 +67,12 @@ def edit_project(project_id, name):
 def delete_project(project_id):
     """Delete a project. PROJECT_ID can be a UUID or project name."""
     async def _run():
-        user_id = require_user_id()
         async with get_session() as db:
-            pid = await resolve_project_id(db, project_id, user_id)
+            pid = await resolve_project_id(db, project_id)
             if not pid:
                 click.echo(f"Project not found: {project_id}", err=True)
                 return
-            ok = await project_service.delete_project(db, pid, user_id)
+            ok = await project_service.delete_project(db, pid)
             if not ok:
                 click.echo("Project not found.", err=True)
                 return
@@ -90,13 +86,12 @@ def delete_project(project_id):
 def set_default(project_id):
     """Set the default project. PROJECT_ID can be a UUID or project name."""
     async def _run():
-        user_id = require_user_id()
         async with get_session() as db:
-            pid = await resolve_project_id(db, project_id, user_id)
+            pid = await resolve_project_id(db, project_id)
             if not pid:
                 click.echo(f"Project not found: {project_id}", err=True)
                 return
-            p = await project_service.set_default_project(db, pid, user_id)
+            p = await project_service.set_default_project(db, pid)
             if not p:
                 click.echo("Project not found.", err=True)
                 return

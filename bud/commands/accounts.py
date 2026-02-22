@@ -3,7 +3,7 @@ import click
 from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
-from bud.commands.utils import require_user_id, resolve_project_id, resolve_account_id, is_uuid
+from bud.commands.utils import resolve_project_id, resolve_account_id, is_uuid
 from bud.models.account import AccountType
 from bud.schemas.account import AccountCreate, AccountUpdate
 from bud.services import accounts as account_service
@@ -20,13 +20,12 @@ def account():
 def list_accounts(project_id):
     """List accounts."""
     async def _run():
-        user_id = require_user_id()
         async with get_session() as db:
-            pid = await resolve_project_id(db, project_id, user_id)
+            pid = await resolve_project_id(db, project_id)
             if not pid:
                 click.echo("Error: no project specified. Use --project or set a default with `bud project set-default`.", err=True)
                 return
-            items = await account_service.list_accounts(db, user_id, pid)
+            items = await account_service.list_accounts(db, pid)
             if not items:
                 click.echo("No accounts found.")
                 return
@@ -43,15 +42,14 @@ def list_accounts(project_id):
 def create_account(name, account_type, project_id):
     """Create a new account."""
     async def _run():
-        user_id = require_user_id()
         async with get_session() as db:
-            pid = await resolve_project_id(db, project_id, user_id)
+            pid = await resolve_project_id(db, project_id)
             if not pid:
                 click.echo("Error: no project specified. Use --project or set a default with `bud project set-default`.", err=True)
                 return
             try:
                 a = await account_service.create_account(
-                    db, AccountCreate(name=name, type=AccountType(account_type), project_id=pid), user_id
+                    db, AccountCreate(name=name, type=AccountType(account_type), project_id=pid)
                 )
                 click.echo(f"Created account: {a.name} ({a.type.value}) id: {a.id}")
             except ValueError as e:
@@ -68,16 +66,15 @@ def create_account(name, account_type, project_id):
 def edit_account(account_id, name, account_type, project_id):
     """Edit an account. ACCOUNT_ID can be a UUID or account name."""
     async def _run():
-        user_id = require_user_id()
         async with get_session() as db:
             if is_uuid(account_id):
                 aid = uuid.UUID(account_id)
             else:
-                pid = await resolve_project_id(db, project_id, user_id)
+                pid = await resolve_project_id(db, project_id)
                 if not pid:
                     click.echo("Error: --project required when using account name.", err=True)
                     return
-                aid = await resolve_account_id(db, account_id, user_id, pid)
+                aid = await resolve_account_id(db, account_id, pid)
                 if not aid:
                     click.echo(f"Account not found: {account_id}", err=True)
                     return
@@ -98,16 +95,15 @@ def edit_account(account_id, name, account_type, project_id):
 def delete_account(account_id, project_id):
     """Delete an account. ACCOUNT_ID can be a UUID or account name."""
     async def _run():
-        user_id = require_user_id()
         async with get_session() as db:
             if is_uuid(account_id):
                 aid = uuid.UUID(account_id)
             else:
-                pid = await resolve_project_id(db, project_id, user_id)
+                pid = await resolve_project_id(db, project_id)
                 if not pid:
                     click.echo("Error: --project required when using account name.", err=True)
                     return
-                aid = await resolve_account_id(db, account_id, user_id, pid)
+                aid = await resolve_account_id(db, account_id, pid)
                 if not aid:
                     click.echo(f"Account not found: {account_id}", err=True)
                     return

@@ -2,7 +2,7 @@ import click
 from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
-from bud.commands.utils import require_user_id, resolve_project_id, resolve_budget_id
+from bud.commands.utils import resolve_project_id, resolve_budget_id
 from bud.schemas.budget import BudgetCreate, BudgetUpdate
 from bud.services import budgets as budget_service
 
@@ -18,9 +18,8 @@ def budget():
 def list_budgets(project_id):
     """List all budgets for a project."""
     async def _run():
-        user_id = require_user_id()
         async with get_session() as db:
-            pid = await resolve_project_id(db, project_id, user_id)
+            pid = await resolve_project_id(db, project_id)
             if not pid:
                 click.echo("Error: no project specified. Use --project or set a default with `bud project set-default`.", err=True)
                 return
@@ -40,9 +39,8 @@ def list_budgets(project_id):
 def create_budget(month, project_id):
     """Create a budget for a month."""
     async def _run():
-        user_id = require_user_id()
         async with get_session() as db:
-            pid = await resolve_project_id(db, project_id, user_id)
+            pid = await resolve_project_id(db, project_id)
             if not pid:
                 click.echo("Error: no project specified. Use --project or set a default with `bud project set-default`.", err=True)
                 return
@@ -59,14 +57,13 @@ def create_budget(month, project_id):
 def edit_budget(budget_id, month, project_id):
     """Edit a budget. BUDGET_ID can be a UUID or month name (YYYY-MM)."""
     async def _run():
-        user_id = require_user_id()
         async with get_session() as db:
             from bud.commands.utils import is_uuid
             if is_uuid(budget_id):
                 import uuid
                 bid = uuid.UUID(budget_id)
             else:
-                pid = await resolve_project_id(db, project_id, user_id)
+                pid = await resolve_project_id(db, project_id)
                 if not pid:
                     click.echo("Error: --project required when using month name for budget.", err=True)
                     return
@@ -90,14 +87,13 @@ def edit_budget(budget_id, month, project_id):
 def delete_budget(budget_id, project_id):
     """Delete a budget. BUDGET_ID can be a UUID or month name (YYYY-MM)."""
     async def _run():
-        user_id = require_user_id()
         async with get_session() as db:
             from bud.commands.utils import is_uuid
             if is_uuid(budget_id):
                 import uuid
                 bid = uuid.UUID(budget_id)
             else:
-                pid = await resolve_project_id(db, project_id, user_id)
+                pid = await resolve_project_id(db, project_id)
                 if not pid:
                     click.echo("Error: --project required when using month name for budget.", err=True)
                     return

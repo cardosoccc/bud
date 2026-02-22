@@ -13,7 +13,6 @@ from bud.schemas.transaction import TransactionCreate, TransactionUpdate
 
 async def list_transactions(
     db: AsyncSession,
-    user_id: uuid.UUID,
     project_id: uuid.UUID,
     month: Optional[str] = None,  # YYYY-MM
 ) -> List[Transaction]:
