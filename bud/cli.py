@@ -8,6 +8,7 @@ from bud.commands.transactions import transaction
 from bud.commands.budgets import budget
 from bud.commands.forecasts import forecast
 from bud.commands.reports import report
+from bud.commands.db_commands import db
 from bud.commands.config_store import set_config_value
 
 
@@ -25,6 +26,7 @@ cli.add_command(transaction)
 cli.add_command(budget)
 cli.add_command(forecast)
 cli.add_command(report)
+cli.add_command(db)
 
 
 @cli.command("set-month")
