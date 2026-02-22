@@ -37,7 +37,7 @@ def list_transactions(month, project_id):
                 click.echo("No transactions found.")
                 return
             rows = [
-                [str(t.id)[:8], t.date, t.description, t.value, str(t.source_account_id)[:8], str(t.destination_account_id)[:8]]
+                [str(t.id)[:8], t.date, t.description, t.value, t.source_account.name, t.destination_account.name]
                 for t in items
             ]
             click.echo(tabulate(rows, headers=["ID", "Date", "Description", "Value", "From", "To"], tablefmt="psql", floatfmt=".2f"))
@@ -59,8 +59,8 @@ def show_transaction(transaction_id):
             click.echo(f"Date:        {t.date}")
             click.echo(f"Description: {t.description}")
             click.echo(f"Value:       {t.value}")
-            click.echo(f"From:        {t.source_account_id}")
-            click.echo(f"To:          {t.destination_account_id}")
+            click.echo(f"From:        {t.source_account.name}")
+            click.echo(f"To:          {t.destination_account.name}")
             click.echo(f"Category:    {t.category_id or '-'}")
             click.echo(f"Tags:        {', '.join(t.tags) if t.tags else '-'}")
 
