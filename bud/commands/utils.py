@@ -4,15 +4,7 @@ import sys
 from typing import Optional
 import click
 
-from bud.commands.config_store import get_user_id, get_default_project_id, get_active_month
-
-
-def require_user_id() -> uuid.UUID:
-    uid = get_user_id()
-    if not uid:
-        click.echo("Error: not logged in. Run `bud auth login` first.", err=True)
-        sys.exit(1)
-    return uuid.UUID(uid)
+from bud.commands.config_store import get_default_project_id, get_active_month
 
 
 def require_project_id(project_id: str = None) -> uuid.UUID:
@@ -40,7 +32,7 @@ def is_uuid(s: str) -> bool:
         return False
 
 
-async def resolve_project_id(db, identifier: Optional[str], user_id: uuid.UUID) -> Optional[uuid.UUID]:
+async def resolve_project_id(db, identifier: Optional[str]) -> Optional[uuid.UUID]:
     """Resolve a project name or UUID to a UUID. Falls back to default project if None."""
     from bud.services import projects as project_service
 
@@ -53,12 +45,12 @@ async def resolve_project_id(db, identifier: Optional[str], user_id: uuid.UUID) 
     if is_uuid(identifier):
         return uuid.UUID(identifier)
 
-    project = await project_service.get_project_by_name(db, identifier, user_id)
+    project = await project_service.get_project_by_name(db, identifier)
     return project.id if project else None
 
 
 async def resolve_account_id(
-    db, identifier: str, user_id: uuid.UUID, project_id: Optional[uuid.UUID] = None
+    db, identifier: str, project_id: Optional[uuid.UUID] = None
 ) -> Optional[uuid.UUID]:
     """Resolve an account name or UUID to a UUID."""
     from bud.services import accounts as account_service
@@ -69,18 +61,18 @@ async def resolve_account_id(
     if project_id is None:
         return None
 
-    account = await account_service.get_account_by_name(db, identifier, user_id, project_id)
+    account = await account_service.get_account_by_name(db, identifier, project_id)
     return account.id if account else None
 
 
-async def resolve_category_id(db, identifier: str, user_id: uuid.UUID) -> Optional[uuid.UUID]:
+async def resolve_category_id(db, identifier: str) -> Optional[uuid.UUID]:
     """Resolve a category name or UUID to a UUID."""
     from bud.services import categories as category_service
 
     if is_uuid(identifier):
         return uuid.UUID(identifier)
 
-    category = await category_service.get_category_by_name(db, identifier, user_id)
+    category = await category_service.get_category_by_name(db, identifier)
     return category.id if category else None
 
 

@@ -33,10 +33,6 @@ def set_config_value(key: str, value) -> None:
     save_config(config)
 
 
-def get_user_id() -> Optional[str]:
-    return get_config_value("user_id")
-
-
 def get_active_month() -> Optional[str]:
     return get_config_value("active_month")
 

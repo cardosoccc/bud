@@ -3,38 +3,35 @@ from typing import Optional, List
 
 from sqlalchemy import select, delete, insert
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from bud.models.account import Account, AccountType
 from bud.models.project import Project, project_accounts
 from bud.schemas.account import AccountCreate, AccountUpdate
 
 
-async def list_accounts(db: AsyncSession, user_id: uuid.UUID, project_id: Optional[uuid.UUID] = None) -> List[Account]:
+async def list_accounts(db: AsyncSession, project_id: Optional[uuid.UUID] = None) -> List[Account]:
     if project_id:
         result = await db.execute(
             select(Account)
             .join(project_accounts, Account.id == project_accounts.c.account_id)
             .join(Project, project_accounts.c.project_id == Project.id)
-            .where(Project.id == project_id, Project.user_id == user_id)
+            .where(Project.id == project_id)
         )
     else:
         result = await db.execute(
             select(Account)
             .join(project_accounts, Account.id == project_accounts.c.account_id)
-            .join(Project, project_accounts.c.project_id == Project.id)
-            .where(Project.user_id == user_id)
             .distinct()
         )
     return list(result.scalars().all())
 
 
-async def get_account_by_name(db: AsyncSession, name: str, user_id: uuid.UUID, project_id: uuid.UUID) -> Optional[Account]:
+async def get_account_by_name(db: AsyncSession, name: str, project_id: uuid.UUID) -> Optional[Account]:
     result = await db.execute(
         select(Account)
         .join(project_accounts, Account.id == project_accounts.c.account_id)
         .join(Project, project_accounts.c.project_id == Project.id)
-        .where(Account.name == name, Project.id == project_id, Project.user_id == user_id)
+        .where(Account.name == name, Project.id == project_id)
     )
     return result.scalar_one_or_none()
 
@@ -44,16 +41,13 @@ async def get_account(db: AsyncSession, account_id: uuid.UUID) -> Optional[Accou
     return result.scalar_one_or_none()
 
 
-async def create_account(db: AsyncSession, data: AccountCreate, user_id: uuid.UUID) -> Account:
-    # Verify project belongs to user
-    proj_result = await db.execute(
-        select(Project).where(Project.id == data.project_id, Project.user_id == user_id)
-    )
+async def create_account(db: AsyncSession, data: AccountCreate) -> Account:
+    proj_result = await db.execute(select(Project).where(Project.id == data.project_id))
     project = proj_result.scalar_one_or_none()
     if not project:
         raise ValueError("Project not found")
 
-    existing = await get_account_by_name(db, data.name, user_id, data.project_id)
+    existing = await get_account_by_name(db, data.name, data.project_id)
     if existing:
         raise ValueError(f"Account '{data.name}' already exists in this project")
 
@@ -86,12 +80,10 @@ async def delete_account(db: AsyncSession, account_id: uuid.UUID) -> bool:
     return True
 
 
-async def get_nil_account(db: AsyncSession, user_id: uuid.UUID) -> Optional[Account]:
+async def get_nil_account(db: AsyncSession) -> Optional[Account]:
     result = await db.execute(
         select(Account)
-        .join(project_accounts, Account.id == project_accounts.c.account_id)
-        .join(Project, project_accounts.c.project_id == Project.id)
-        .where(Project.user_id == user_id, Account.type == AccountType.nil)
+        .where(Account.type == AccountType.nil)
         .limit(1)
     )
     return result.scalar_one_or_none()

@@ -1,6 +1,5 @@
 import click
 
-from bud.commands.auth import auth
 from bud.commands.projects import project
 from bud.commands.accounts import account
 from bud.commands.categories import category
@@ -18,7 +17,6 @@ def cli():
     pass
 
 
-cli.add_command(auth)
 cli.add_command(project)
 cli.add_command(account)
 cli.add_command(category)

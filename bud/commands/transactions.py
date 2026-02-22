@@ -5,7 +5,7 @@ from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
 from bud.commands.utils import (
-    require_user_id, resolve_project_id, resolve_account_id, resolve_category_id, is_uuid
+    resolve_project_id, resolve_account_id, resolve_category_id, is_uuid
 )
 from bud.schemas.transaction import TransactionCreate, TransactionUpdate
 from bud.services import transactions as transaction_service
@@ -24,15 +24,14 @@ def transaction():
 def list_transactions(month, project_id):
     """List transactions for a given month."""
     async def _run():
-        user_id = require_user_id()
         async with get_session() as db:
-            pid = await resolve_project_id(db, project_id, user_id)
+            pid = await resolve_project_id(db, project_id)
             if not pid:
                 click.echo("Error: no project specified. Use --project or set a default with `bud project set-default`.", err=True)
                 return
             from bud.commands.utils import require_month
             m = require_month(month)
-            items = await transaction_service.list_transactions(db, user_id, pid, m)
+            items = await transaction_service.list_transactions(db, pid, m)
             if not items:
                 click.echo("No transactions found.")
                 return
@@ -82,17 +81,16 @@ def create_transaction(value, description, txn_date, source_id, dest_id, project
         raise click.UsageError("At least one of --from or --to must be specified.")
 
     async def _run():
-        user_id = require_user_id()
         d = date_type.fromisoformat(txn_date) if txn_date else date_type.today()
         tag_list = [t.strip() for t in tags.split(",")] if tags else []
 
         async with get_session() as db:
-            pid = await resolve_project_id(db, project_id, user_id)
+            pid = await resolve_project_id(db, project_id)
             if not pid:
                 click.echo("Error: no project specified. Use --project or set a default with `bud project set-default`.", err=True)
                 return
 
-            nil_account = await account_service.get_nil_account(db, user_id)
+            nil_account = await account_service.get_nil_account(db)
             if not nil_account:
                 click.echo("Error: nil account not found.", err=True)
                 return
@@ -101,7 +99,7 @@ def create_transaction(value, description, txn_date, source_id, dest_id, project
             if source_id is None:
                 src = nil_id
             else:
-                src = await resolve_account_id(db, source_id, user_id, pid)
+                src = await resolve_account_id(db, source_id, pid)
                 if not src:
                     click.echo(f"Source account not found: {source_id}", err=True)
                     return
@@ -109,14 +107,14 @@ def create_transaction(value, description, txn_date, source_id, dest_id, project
             if dest_id is None:
                 dst = nil_id
             else:
-                dst = await resolve_account_id(db, dest_id, user_id, pid)
+                dst = await resolve_account_id(db, dest_id, pid)
                 if not dst:
                     click.echo(f"Destination account not found: {dest_id}", err=True)
                     return
 
             cat = None
             if category_id:
-                cat = await resolve_category_id(db, category_id, user_id)
+                cat = await resolve_category_id(db, category_id)
                 if not cat:
                     if is_uuid(category_id):
                         click.echo(f"Category not found: {category_id}", err=True)
@@ -124,7 +122,7 @@ def create_transaction(value, description, txn_date, source_id, dest_id, project
                     if click.confirm(f"Category '{category_id}' not found. Create it?", default=False):
                         from bud.schemas.category import CategoryCreate
                         from bud.services import categories as category_service
-                        new_cat = await category_service.create_category(db, CategoryCreate(name=category_id), user_id)
+                        new_cat = await category_service.create_category(db, CategoryCreate(name=category_id))
                         cat = new_cat.id
                         click.echo(f"Created category: {new_cat.name}")
                     else:
@@ -155,14 +153,13 @@ def create_transaction(value, description, txn_date, source_id, dest_id, project
 def edit_transaction(transaction_id, value, description, txn_date, category_id, tags):
     """Edit a transaction."""
     async def _run():
-        user_id = require_user_id()
         async with get_session() as db:
             d = date_type.fromisoformat(txn_date) if txn_date else None
             tag_list = [t.strip() for t in tags.split(",")] if tags else None
 
             cat = None
             if category_id:
-                cat = await resolve_category_id(db, category_id, user_id)
+                cat = await resolve_category_id(db, category_id)
                 if not cat:
                     if is_uuid(category_id):
                         click.echo(f"Category not found: {category_id}", err=True)
@@ -170,7 +167,7 @@ def edit_transaction(transaction_id, value, description, txn_date, category_id, 
                     if click.confirm(f"Category '{category_id}' not found. Create it?", default=False):
                         from bud.schemas.category import CategoryCreate
                         from bud.services import categories as category_service
-                        new_cat = await category_service.create_category(db, CategoryCreate(name=category_id), user_id)
+                        new_cat = await category_service.create_category(db, CategoryCreate(name=category_id))
                         cat = new_cat.id
                         click.echo(f"Created category: {new_cat.name}")
                     else:

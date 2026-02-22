@@ -4,7 +4,7 @@ import click
 from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
-from bud.commands.utils import require_user_id, resolve_project_id, resolve_budget_id, is_uuid
+from bud.commands.utils import resolve_project_id, resolve_budget_id, is_uuid
 from bud.services import reports as report_service
 
 
@@ -24,13 +24,12 @@ def show_report(budget_id, project_id):
     to the current month's budget.
     """
     async def _run():
-        user_id = require_user_id()
         async with get_session() as db:
             try:
                 if budget_id is not None and is_uuid(budget_id):
                     bid = uuid.UUID(budget_id)
                 else:
-                    pid = await resolve_project_id(db, project_id, user_id)
+                    pid = await resolve_project_id(db, project_id)
                     if not pid:
                         click.echo(
                             "Error: no project specified. Use --project or set a default with"
