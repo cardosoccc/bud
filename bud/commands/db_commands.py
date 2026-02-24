@@ -3,12 +3,17 @@ import click
 
 from bud.commands.config_store import DB_PATH
 from bud.commands.db import get_engine, run_async
+from bud.commands.sync import push, pull
 
 
 @click.group("db")
 def db():
     """Database management commands."""
     pass
+
+
+db.add_command(push)
+db.add_command(pull)
 
 
 @db.command("init")
