@@ -35,6 +35,15 @@ def set_month(month):
     click.echo(f"Active month set to: {month}")
 
 
+@cli.command("set-config")
+@click.argument("key")
+@click.argument("value")
+def set_config(key, value):
+    """Set a configuration value (e.g. bucket s3://my-bucket)."""
+    set_config_value(key, value)
+    click.echo(f"{key}: {value}")
+
+
 @cli.command("config")
 @click.option("--show", is_flag=True, help="Show current config")
 def config(show):
