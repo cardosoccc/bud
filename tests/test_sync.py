@@ -117,7 +117,7 @@ class TestPush:
         monkeypatch.setattr("bud.commands.config_store.CONFIG_FILE", config_file)
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["push"])
+        result = runner.invoke(cli, ["db", "push"])
         assert result.exit_code != 0
         assert "no bucket configured" in result.output.lower() or "no bucket configured" in (result.output + (result.stderr if hasattr(result, 'stderr') else '')).lower()
 
@@ -135,7 +135,7 @@ class TestPush:
         monkeypatch.setattr("bud.commands.config_store.CONFIG_FILE", config_file)
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["push"])
+        result = runner.invoke(cli, ["db", "push"])
         assert result.exit_code != 0
         assert "does not exist" in result.output.lower()
 
@@ -145,7 +145,7 @@ class TestPush:
 
         with patch("bud.services.storage.get_provider", return_value=fake):
             runner = CliRunner()
-            result = runner.invoke(cli, ["push"])
+            result = runner.invoke(cli, ["db", "push"])
 
         assert result.exit_code == 0
         assert "version 1" in result.output.lower()
@@ -165,7 +165,7 @@ class TestPush:
 
         with patch("bud.services.storage.get_provider", return_value=fake):
             runner = CliRunner()
-            result = runner.invoke(cli, ["push"])
+            result = runner.invoke(cli, ["db", "push"])
 
         assert result.exit_code == 0
         assert "version 4" in result.output.lower()
@@ -179,7 +179,7 @@ class TestPush:
 
         with patch("bud.services.storage.get_provider", return_value=fake):
             runner = CliRunner()
-            result = runner.invoke(cli, ["push"])
+            result = runner.invoke(cli, ["db", "push"])
 
         assert result.exit_code != 0
         assert "newer" in result.output.lower()
@@ -192,7 +192,7 @@ class TestPush:
 
         with patch("bud.services.storage.get_provider", return_value=fake):
             runner = CliRunner()
-            result = runner.invoke(cli, ["push", "--force"])
+            result = runner.invoke(cli, ["db", "push", "--force"])
 
         assert result.exit_code == 0
         # version should be max(2,5) + 1 = 6
@@ -207,7 +207,7 @@ class TestPull:
 
         with patch("bud.services.storage.get_provider", return_value=fake):
             runner = CliRunner()
-            result = runner.invoke(cli, ["pull"])
+            result = runner.invoke(cli, ["db", "pull"])
 
         assert result.exit_code != 0
         assert "no database found" in result.output.lower()
@@ -220,7 +220,7 @@ class TestPull:
 
         with patch("bud.services.storage.get_provider", return_value=fake):
             runner = CliRunner()
-            result = runner.invoke(cli, ["pull"])
+            result = runner.invoke(cli, ["db", "pull"])
 
         assert result.exit_code == 0
         assert "version 3" in result.output.lower()
@@ -238,7 +238,7 @@ class TestPull:
 
         with patch("bud.services.storage.get_provider", return_value=fake):
             runner = CliRunner()
-            result = runner.invoke(cli, ["pull"])
+            result = runner.invoke(cli, ["db", "pull"])
 
         assert result.exit_code == 0
         backup = db_file.with_suffix(".db.bak")
@@ -254,7 +254,7 @@ class TestPull:
 
         with patch("bud.services.storage.get_provider", return_value=fake):
             runner = CliRunner()
-            result = runner.invoke(cli, ["pull"])
+            result = runner.invoke(cli, ["db", "pull"])
 
         assert result.exit_code != 0
         assert "newer" in result.output.lower()
@@ -268,7 +268,7 @@ class TestPull:
 
         with patch("bud.services.storage.get_provider", return_value=fake):
             runner = CliRunner()
-            result = runner.invoke(cli, ["pull", "--force"])
+            result = runner.invoke(cli, ["db", "pull", "--force"])
 
         assert result.exit_code == 0
         assert db_file.read_bytes() == b"remote-data-forced"
