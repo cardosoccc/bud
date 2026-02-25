@@ -9,7 +9,6 @@ from bud.commands.utils import (
 )
 from bud.schemas.transaction import TransactionCreate, TransactionUpdate
 from bud.services import transactions as transaction_service
-from bud.services import accounts as account_service
 
 
 @click.group()
@@ -36,10 +35,10 @@ def list_transactions(month, project_id):
                 click.echo("No transactions found.")
                 return
             rows = [
-                [str(t.id)[:8], t.date, t.description, t.value, t.source_account.name, t.destination_account.name]
+                [str(t.id)[:8], t.date, t.description, t.value, t.account.name]
                 for t in items
             ]
-            click.echo(tabulate(rows, headers=["ID", "Date", "Description", "Value", "From", "To"], tablefmt="psql", floatfmt=".2f"))
+            click.echo(tabulate(rows, headers=["ID", "Date", "Description", "Value", "Account"], tablefmt="psql", floatfmt=".2f"))
 
     run_async(_run())
 
@@ -58,8 +57,7 @@ def show_transaction(transaction_id):
             click.echo(f"Date:        {t.date}")
             click.echo(f"Description: {t.description}")
             click.echo(f"Value:       {t.value}")
-            click.echo(f"From:        {t.source_account.name}")
-            click.echo(f"To:          {t.destination_account.name}")
+            click.echo(f"Account:     {t.account.name}")
             click.echo(f"Category:    {t.category_id or '-'}")
             click.echo(f"Tags:        {', '.join(t.tags) if t.tags else '-'}")
 
@@ -67,19 +65,15 @@ def show_transaction(transaction_id):
 
 
 @transaction.command("create")
-@click.option("--value", required=True, type=float)
+@click.option("--value", required=True, type=float, help="Amount (positive = income, negative = expense)")
 @click.option("--description", required=True)
 @click.option("--date", "txn_date", default=None, help="YYYY-MM-DD (default: today)")
-@click.option("--from", "source_id", default=None, help="Source account UUID or name (default: nil)")
-@click.option("--to", "dest_id", default=None, help="Destination account UUID or name (default: nil)")
+@click.option("--account", "account_id", required=True, help="Account UUID or name")
 @click.option("--project", "project_id", default=None, help="Project UUID or name")
 @click.option("--category", "category_id", default=None, help="Category UUID or name")
 @click.option("--tags", default=None, help="Comma-separated tags")
-def create_transaction(value, description, txn_date, source_id, dest_id, project_id, category_id, tags):
-    """Create a new transaction."""
-    if source_id is None and dest_id is None:
-        raise click.UsageError("At least one of --from or --to must be specified.")
-
+def create_transaction(value, description, txn_date, account_id, project_id, category_id, tags):
+    """Create a new transaction. Use positive values for income and negative for expenses."""
     async def _run():
         d = date_type.fromisoformat(txn_date) if txn_date else date_type.today()
         tag_list = [t.strip() for t in tags.split(",")] if tags else []
@@ -90,27 +84,10 @@ def create_transaction(value, description, txn_date, source_id, dest_id, project
                 click.echo("Error: no project specified. Use --project or set a default with `bud project set-default`.", err=True)
                 return
 
-            nil_account = await account_service.get_nil_account(db)
-            if not nil_account:
-                click.echo("Error: nil account not found.", err=True)
+            acc = await resolve_account_id(db, account_id, pid)
+            if not acc:
+                click.echo(f"Account not found: {account_id}", err=True)
                 return
-            nil_id = nil_account.id
-
-            if source_id is None:
-                src = nil_id
-            else:
-                src = await resolve_account_id(db, source_id, pid)
-                if not src:
-                    click.echo(f"Source account not found: {source_id}", err=True)
-                    return
-
-            if dest_id is None:
-                dst = nil_id
-            else:
-                dst = await resolve_account_id(db, dest_id, pid)
-                if not dst:
-                    click.echo(f"Destination account not found: {dest_id}", err=True)
-                    return
 
             cat = None
             if category_id:
@@ -132,8 +109,7 @@ def create_transaction(value, description, txn_date, source_id, dest_id, project
                 value=value,
                 description=description,
                 date=d,
-                source_account_id=src,
-                destination_account_id=dst,
+                account_id=acc,
                 project_id=pid,
                 category_id=cat,
                 tags=tag_list,

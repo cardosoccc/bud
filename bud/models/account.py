@@ -11,7 +11,6 @@ from bud.database import Base
 class AccountType(str, enum.Enum):
     credit = "credit"
     debit = "debit"
-    nil = "nil"
 
 
 class Account(Base):
@@ -25,13 +24,8 @@ class Account(Base):
 
     projects: Mapped[list["Project"]] = relationship("Project", secondary="project_accounts", back_populates="accounts")  # noqa: F821
 
-    outgoing_transactions: Mapped[list["Transaction"]] = relationship(  # noqa: F821
+    transactions: Mapped[list["Transaction"]] = relationship(  # noqa: F821
         "Transaction",
-        foreign_keys="Transaction.source_account_id",
-        back_populates="source_account",
-    )
-    incoming_transactions: Mapped[list["Transaction"]] = relationship(  # noqa: F821
-        "Transaction",
-        foreign_keys="Transaction.destination_account_id",
-        back_populates="destination_account",
+        foreign_keys="Transaction.account_id",
+        back_populates="account",
     )

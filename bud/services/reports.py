@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from bud.models.budget import Budget
 from bud.models.forecast import Forecast
 from bud.models.transaction import Transaction
-from bud.models.account import Account, AccountType
+from bud.models.account import Account
 from bud.models.project import project_accounts
 from bud.schemas.report import ReportRead, AccountBalance, ForecastActual
 
@@ -27,19 +27,15 @@ async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
     accts_result = await db.execute(
         select(Account)
         .join(project_accounts, Account.id == project_accounts.c.account_id)
-        .where(
-            project_accounts.c.project_id == budget.project_id,
-            Account.type != AccountType.nil,
-        )
+        .where(project_accounts.c.project_id == budget.project_id)
     )
     accounts = list(accts_result.scalars().all())
 
-    # Get all primary transactions in the budget period
+    # Get all transactions in the budget period
     txns_result = await db.execute(
         select(Transaction).where(
             and_(
                 Transaction.project_id == budget.project_id,
-                Transaction.is_counterpart == False,  # noqa: E712
                 Transaction.date >= budget.start_date,
                 Transaction.date <= budget.end_date,
             )
@@ -47,48 +43,32 @@ async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
     )
     transactions = list(txns_result.scalars().all())
 
-    # Calculate account balances
+    # Calculate account balances and totals
+    # Positive value = money coming in (income), negative value = money going out (expense)
     account_balances = []
     total_balance = Decimal("0")
     total_earnings = Decimal("0")
     total_expenses = Decimal("0")
 
     for account in accounts:
-        inflows = sum(
-            t.value for t in transactions if t.destination_account_id == account.id
+        net = sum(
+            Decimal(str(t.value)) for t in transactions if t.account_id == account.id
         )
-        outflows = sum(
-            t.value for t in transactions if t.source_account_id == account.id
-        )
-        balance = Decimal(str(inflows)) - Decimal(str(outflows))
         account_balances.append(
             AccountBalance(
                 account_id=account.id,
                 account_name=account.name,
-                balance=balance,
+                balance=net,
             )
         )
-        total_balance += balance
-
-    # Get nil accounts (external flows)
-    nil_accts_result = await db.execute(
-        select(Account)
-        .join(project_accounts, Account.id == project_accounts.c.account_id)
-        .where(
-            project_accounts.c.project_id == budget.project_id,
-            Account.type == AccountType.nil,
-        )
-    )
-    nil_accounts = {a.id for a in nil_accts_result.scalars().all()}
+        total_balance += net
 
     for t in transactions:
         val = Decimal(str(t.value))
-        if t.source_account_id in nil_accounts and t.destination_account_id not in nil_accounts:
-            # Money coming in from external: earnings
+        if val > 0:
             total_earnings += val
-        elif t.destination_account_id in nil_accounts and t.source_account_id not in nil_accounts:
-            # Money going out to external: expenses
-            total_expenses += val
+        else:
+            total_expenses += abs(val)
 
     # Get forecasts and compute actuals
     forecasts_result = await db.execute(

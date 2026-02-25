@@ -78,12 +78,3 @@ async def delete_account(db: AsyncSession, account_id: uuid.UUID) -> bool:
     await db.delete(account)
     await db.commit()
     return True
-
-
-async def get_nil_account(db: AsyncSession) -> Optional[Account]:
-    result = await db.execute(
-        select(Account)
-        .where(Account.type == AccountType.nil)
-        .limit(1)
-    )
-    return result.scalar_one_or_none()

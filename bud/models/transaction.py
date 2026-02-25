@@ -3,7 +3,7 @@ from datetime import date, datetime
 from typing import Optional
 from decimal import Decimal
 
-from sqlalchemy import String, Numeric, ForeignKey, Date, DateTime, Uuid, func, JSON, Boolean
+from sqlalchemy import String, Numeric, ForeignKey, Date, DateTime, Uuid, func, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from bud.database import Base
@@ -17,12 +17,8 @@ class Transaction(Base):
     description: Mapped[str] = mapped_column(String(500), nullable=False)
     date: Mapped[date] = mapped_column(Date, nullable=False)
     tags: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
-    is_counterpart: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    source_account_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False
-    )
-    destination_account_id: Mapped[uuid.UUID] = mapped_column(
+    account_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False
     )
     category_id: Mapped[Optional[uuid.UUID]] = mapped_column(
@@ -31,19 +27,10 @@ class Transaction(Base):
     project_id: Mapped[uuid.UUID] = mapped_column(
         Uuid, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
     )
-    counterpart_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        Uuid, ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True
-    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    source_account: Mapped["Account"] = relationship(  # noqa: F821
-        "Account", foreign_keys=[source_account_id], back_populates="outgoing_transactions"
-    )
-    destination_account: Mapped["Account"] = relationship(  # noqa: F821
-        "Account", foreign_keys=[destination_account_id], back_populates="incoming_transactions"
+    account: Mapped["Account"] = relationship(  # noqa: F821
+        "Account", foreign_keys=[account_id], back_populates="transactions"
     )
     category: Mapped[Optional["Category"]] = relationship("Category", back_populates="transactions")  # noqa: F821
     project: Mapped["Project"] = relationship("Project", back_populates="transactions")  # noqa: F821
-    counterpart: Mapped[Optional["Transaction"]] = relationship(
-        "Transaction", foreign_keys=[counterpart_id], remote_side="Transaction.id"
-    )
