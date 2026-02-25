@@ -17,7 +17,8 @@ def account():
 
 @account.command("list")
 @click.option("--project", "project_id", default=None, help="Project UUID or name")
-def list_accounts(project_id):
+@click.option("--show-id", is_flag=True, default=False, help="Show account UUIDs")
+def list_accounts(project_id, show_id):
     """List accounts."""
     async def _run():
         async with get_session() as db:
@@ -29,14 +30,20 @@ def list_accounts(project_id):
             if not items:
                 click.echo("No accounts found.")
                 return
-            rows = [[str(a.id), a.name, a.type.value, f"{a.initial_balance:.2f}", f"{a.current_balance:.2f}"] for a in items]
-            click.echo(tabulate(rows, headers=["ID", "Name", "Type", "Initial Balance", "Current Balance"], tablefmt="psql"))
+            items = sorted(items, key=lambda a: a.name.lower())
+            if show_id:
+                rows = [[str(a.id), a.name, a.type.value, f"{a.initial_balance:.2f}", f"{a.current_balance:.2f}"] for a in items]
+                headers = ["ID", "Name", "Type", "Initial Balance", "Current Balance"]
+            else:
+                rows = [[a.name, a.type.value, f"{a.initial_balance:.2f}", f"{a.current_balance:.2f}"] for a in items]
+                headers = ["Name", "Type", "Initial Balance", "Current Balance"]
+            click.echo(tabulate(rows, headers=headers, tablefmt="psql"))
 
     run_async(_run())
 
 
 @account.command("create")
-@click.option("--name", required=True)
+@click.argument("name")
 @click.option("--type", "account_type", type=click.Choice(["credit", "debit"]), default="debit")
 @click.option("--project", "project_id", default=None, help="Project UUID or name")
 @click.option("--initial-balance", "initial_balance", type=float, default=0, help="Initial balance (default: 0)")
