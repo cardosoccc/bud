@@ -5,6 +5,10 @@ from typing import Optional, List
 
 from pydantic import BaseModel
 
+# Type alias used in TransactionUpdate to avoid Pydantic v2 misresolving the
+# annotation when the field name ("date") shadows the datetime.date type name.
+_Date = date
+
 
 class TransactionCreate(BaseModel):
     value: Decimal
@@ -33,7 +37,7 @@ class TransactionRead(BaseModel):
 class TransactionUpdate(BaseModel):
     value: Optional[Decimal] = None
     description: Optional[str] = None
-    date: Optional[date] = None
+    date: Optional[_Date] = None
     account_id: Optional[uuid.UUID] = None
     category_id: Optional[uuid.UUID] = None
     tags: Optional[List[str]] = None

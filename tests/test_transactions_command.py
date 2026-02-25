@@ -870,10 +870,7 @@ def test_edit_value(runner, cli_db):
     assert fetched.value == Decimal("-99.99")
 
 
-def test_edit_date_option_exists(runner, cli_db):
-    # Verify the --date option is accepted by the CLI (schema-level date
-    # editing has a known Pydantic v2 limitation with the field name shadowing
-    # the datetime.date type in TransactionUpdate).
+def test_edit_date(runner, cli_db):
     pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
     aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
     tid, _ = asyncio.run(_seed_transaction(cli_db, pid, aid, txn_date=date(2025, 1, 1)))
@@ -881,8 +878,10 @@ def test_edit_date_option_exists(runner, cli_db):
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
         result = runner.invoke(transaction, ["edit", str(tid), "--date", "2025-06-15"])
 
-    # The command is invoked without a "No such option" error
-    assert "No such option" not in result.output
+    assert result.exit_code == 0
+
+    fetched = asyncio.run(_fetch_transaction(cli_db, tid))
+    assert fetched.date == date(2025, 6, 15)
 
 
 def test_edit_tags(runner, cli_db):
