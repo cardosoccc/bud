@@ -51,7 +51,7 @@ async def create_account(db: AsyncSession, data: AccountCreate) -> Account:
     if existing:
         raise ValueError(f"Account '{data.name}' already exists in this project")
 
-    account = Account(name=data.name, type=data.type)
+    account = Account(name=data.name, type=data.type, initial_balance=data.initial_balance, current_balance=data.initial_balance)
     db.add(account)
     await db.flush()
     await db.execute(insert(project_accounts).values(project_id=project.id, account_id=account.id))
