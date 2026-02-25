@@ -37,7 +37,7 @@ def list_accounts(project_id):
 
 @account.command("create")
 @click.option("--name", required=True)
-@click.option("--type", "account_type", type=click.Choice(["credit", "debit", "nil"]), default="debit")
+@click.option("--type", "account_type", type=click.Choice(["credit", "debit"]), default="debit")
 @click.option("--project", "project_id", default=None, help="Project UUID or name")
 @click.option("--initial-balance", "initial_balance", type=float, default=0, help="Initial balance (default: 0)")
 def create_account(name, account_type, project_id, initial_balance):
@@ -62,7 +62,7 @@ def create_account(name, account_type, project_id, initial_balance):
 @account.command("edit")
 @click.argument("account_id")
 @click.option("--name", default=None)
-@click.option("--type", "account_type", type=click.Choice(["credit", "debit", "nil"]), default=None)
+@click.option("--type", "account_type", type=click.Choice(["credit", "debit"]), default=None)
 @click.option("--project", "project_id", default=None, help="Project UUID or name (required when ACCOUNT_ID is a name)")
 def edit_account(account_id, name, account_type, project_id):
     """Edit an account. ACCOUNT_ID can be a UUID or account name."""

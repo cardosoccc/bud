@@ -13,7 +13,7 @@ Most budgeting apps live in the cloud and require trusting a third party with yo
 - Your data lives in a local SQLite file (`~/.bud/bud.db`) — you own it entirely
 - You interact via CLI, which makes it scriptable and automation-friendly
 - Cloud sync (AWS S3 or GCP) is opt-in and on your terms
-- The double-entry accounting model ensures every money movement is fully traceable
+- Transactions are simple, account-relative records — no hidden complexity
 - It works as both a personal tool and as a backend for an AI agent that manages finances on your behalf through any messaging channel
 
 ---
@@ -55,15 +55,16 @@ bud set-month 2025-02
 bud account create --name "Bank" --type debit
 bud account create --name "Credit Card" --type credit
 
-# 6. Record a transaction
-bud transaction create --value 50 --description "Groceries" --from Bank --to nil
+# 6. Record transactions
+bud transaction create --value -50 --description "Groceries" --account Bank
+bud transaction create --value 3000 --description "Salary" --account Bank
 
 # 7. View this month's transactions
 bud txns
 
 # 8. Create a budget and add a forecast
 bud budget create --month 2025-02
-bud forecast create --budget 2025-02 --description "Groceries" --value 200 --category food
+bud forecast create --budget 2025-02 --description "Groceries" --value -200 --category food
 
 # 9. Generate a report
 bud report show 2025-02
@@ -79,26 +80,33 @@ A project is the top-level container for your financial data. You can have multi
 
 ### Accounts
 
-Accounts represent where money lives. There are three types:
+Accounts represent where money lives. There are two types:
 
 | Type | Description | Example |
 |------|-------------|---------|
 | `debit` | Assets you own | Bank account, cash, wallet |
 | `credit` | Liabilities | Credit card, loan |
-| `nil` | External world | Income source, vendor, ATM |
-
-The `nil` account is special: it represents anything outside your tracked accounts. When you receive a salary, money comes *from* `nil`. When you pay a bill, money goes *to* `nil`. This keeps the double-entry system balanced without requiring you to model every counterparty.
 
 Accounts can be shared across multiple projects.
 
 ### Transactions
 
-Every financial event is a transaction: money moves from one account to another. `bud` uses **double-entry accounting** — every transaction automatically creates a mirrored counterpart. This ensures your books always balance.
+A transaction records a money movement relative to a single account. The sign of the value determines the direction:
+
+- **Positive value**: money coming into the account (income, deposits, payments received)
+- **Negative value**: money leaving the account (expenses, withdrawals, payments made)
+
+For example:
+- `--value -50 --account Bank` → $50 expense from your bank account
+- `--value 3000 --account Bank` → $3000 income into your bank account
+- `--value -100 --account "Credit Card"` → $100 charged to your credit card
+
+Transfers between accounts are handled by creating two separate transactions — one per account — with opposite signs.
 
 Transactions have:
-- A **value** (always positive from the user's perspective)
+- A **value** (positive = in, negative = out)
 - A **date** (defaults to today)
-- A **source** and **destination** account
+- An **account** they belong to
 - An optional **category** and **tags**
 
 ### Budgets
@@ -110,6 +118,8 @@ A budget covers a calendar month (`YYYY-MM`). Each budget belongs to a project a
 Forecasts are the planned line items in a budget: expected income, expected expenses, recurring bills, etc. They can be:
 - **One-time**: applies only to the budget they belong to
 - **Recurrent**: automatically applies across multiple months, with optional start/end boundaries
+
+Use positive values for expected income and negative values for expected expenses.
 
 ### Categories
 
@@ -195,7 +205,7 @@ List all accounts for the given project.
 ```
 bud account create --name <name> --type <type> [--project <id>] [--initial-balance <float>]
 ```
-Create a new account. Type must be `credit`, `debit`, or `nil`. The `--initial-balance` option sets a starting balance (default: 0).
+Create a new account. Type must be `credit` or `debit`. The `--initial-balance` option sets a starting balance (default: 0).
 
 ```
 bud account edit <account-id> [--name <name>] [--type <type>] [--project <id>]
@@ -205,7 +215,7 @@ Edit an account's name or type.
 ```
 bud account delete <account-id> [--project <id>]
 ```
-Delete an account. Fails if transactions reference it (use RESTRICT semantics — you must delete or reassign transactions first).
+Delete an account. Fails if transactions reference it (you must delete or reassign transactions first).
 
 ---
 
@@ -214,29 +224,26 @@ Delete an account. Fails if transactions reference it (use RESTRICT semantics �
 ```
 bud transaction list [--month <YYYY-MM>] [--project <id>]
 ```
-List all primary (non-counterpart) transactions for the given month. Defaults to the active month if set. Shows: truncated ID, date, description, value, source account, destination account.
+List all transactions for the given month. Defaults to the active month if set. Shows: truncated ID, date, description, value, account.
 
 ```
 bud transaction show <transaction-id>
 ```
-Show full details of a transaction: ID, date, description, value, from/to accounts, category, and tags.
+Show full details of a transaction: ID, date, description, value, account, category, and tags.
 
 ```
 bud transaction create \
   --value <float> \
   --description <text> \
+  --account <account> \
   [--date <YYYY-MM-DD>] \
-  [--from <account>] \
-  [--to <account>] \
   [--project <id>] \
   [--category <name-or-id>] \
   [--tags <tag1,tag2>]
 ```
-Create a transaction. At least one of `--from` or `--to` must be provided. If the other is omitted, it defaults to the `nil` account. The date defaults to today.
+Create a transaction. `--account` is required. Use a positive `--value` for money coming in (income, deposits) and a negative `--value` for money going out (expenses, payments). The date defaults to today.
 
 If a `--category` name is given that doesn't exist yet, `bud` will ask if you want to create it on the spot.
-
-This command automatically creates the counterpart transaction (see [Double-Entry Accounting](#double-entry-accounting)).
 
 ```
 bud transaction edit <transaction-id> \
@@ -246,12 +253,12 @@ bud transaction edit <transaction-id> \
   [--category <name-or-id>] \
   [--tags <tag1,tag2>]
 ```
-Edit a transaction. Only the fields you provide are updated. Changes are automatically synchronized to the counterpart transaction.
+Edit a transaction. Only the fields you provide are updated.
 
 ```
 bud transaction delete <transaction-id>
 ```
-Delete a transaction. Prompts for confirmation. Both the primary and counterpart records are removed.
+Delete a transaction. Prompts for confirmation.
 
 ---
 
@@ -356,8 +363,8 @@ bud report show [<budget-id>] [--project <id>]
 Generate a report for a budget. `<budget-id>` can be a UUID or a `YYYY-MM` month string. If omitted, defaults to the current active month.
 
 The report shows:
-- **Account balances** — net change for each account in the period (inflows minus outflows)
-- **Totals** — total earnings (money from `nil` accounts), total expenses (money to `nil` accounts), net balance
+- **Account balances** — net change for each account in the period (sum of transaction values)
+- **Totals** — total earnings (sum of positive transaction values), total expenses (sum of absolute negative values), net balance
 - **Forecast vs. Actuals** — for each forecast line item, shows the planned value, actual spend (from transactions with a matching category), and the difference
 - **Projected net balance** — for future months only: the cumulative sum of forecast values from the current month through the target month, accounting for recurrence bounds
 
@@ -534,7 +541,7 @@ bud/
 
 Each layer has a single responsibility:
 - **Commands** handle user input and output only — they parse CLI arguments, resolve human-readable names to UUIDs, call service functions, and format results with `tabulate`
-- **Services** implement business logic — creating counterpart transactions, computing month boundaries, generating reports — with no knowledge of CLI or output formatting
+- **Services** implement business logic — computing month boundaries, generating reports — with no knowledge of CLI or output formatting
 - **Models** define the database schema via SQLAlchemy ORM
 - **Schemas** (Pydantic) validate data at the CLI→service boundary
 
@@ -556,23 +563,16 @@ async with get_session() as db:
 
 SQLite foreign key enforcement is enabled at the connection level via `PRAGMA foreign_keys = ON`.
 
-### Double-Entry Accounting
+### Transaction Model
 
-Every `transaction create` call produces two database rows:
+Each transaction belongs to a single account and carries a signed value:
 
-```
-Primary:     value=+100, from=Bank, to=nil,  is_counterpart=False
-Counterpart: value=-100, from=nil,  to=Bank, is_counterpart=True
-```
+- **Positive value**: money flowing into the account (income, deposits)
+- **Negative value**: money flowing out of the account (expenses, payments)
 
-The counterpart mirrors the primary: value is negated, source and destination are swapped. Both records share a `counterpart_id` that points to each other.
+This makes balance calculations straightforward: the balance for any account over a period is the sum of its transaction values. There are no hidden counterpart records or special "external" accounts.
 
-This design:
-- Makes account balance calculations simple (sum all flows involving an account)
-- Ensures money is never created or destroyed — every movement has an equal and opposite record
-- Keeps the user-facing view clean (list commands only show `is_counterpart=False` rows)
-
-When a primary transaction is edited, the counterpart is automatically updated to stay in sync. When a primary is deleted, the counterpart is also deleted.
+Transfers between two accounts (e.g. paying off a credit card with your bank account) are recorded as two separate transactions — a negative entry on the source account and a positive entry on the destination account. This keeps each transaction simple and self-contained.
 
 ### ID Resolution
 
@@ -585,7 +585,7 @@ Resolution logic in `commands/utils.py`:
 2. Otherwise → query the database by name, scoped to the relevant project where applicable
 3. Return the UUID or `None` if not found (CLI will print an error)
 
-This means you can write `bud transaction create --from "Bank" --to "Credit Card"` instead of copying UUIDs from list output.
+This means you can write `bud transaction create --account "Bank"` instead of copying UUIDs from list output.
 
 ### Cloud Storage Versioning
 
@@ -625,16 +625,14 @@ project_accounts                  ← many-to-many junction
   project_id (FK → projects), account_id (FK → accounts)
 
 accounts
-  id (UUID PK), name, type (credit|debit|nil), initial_balance,
-  current_balance
+  id (UUID PK), name, type (credit|debit), initial_balance, current_balance
 
 transactions
   id (UUID PK), value, description, date, tags (JSON array),
-  is_counterpart, source_account_id (FK → accounts RESTRICT),
-  destination_account_id (FK → accounts RESTRICT),
+  account_id (FK → accounts RESTRICT),
   category_id (FK → categories SET NULL),
   project_id (FK → projects CASCADE),
-  counterpart_id (FK → transactions self-ref), created_at
+  created_at
 
 budgets
   id (UUID PK), name (YYYY-MM), start_date, end_date,
