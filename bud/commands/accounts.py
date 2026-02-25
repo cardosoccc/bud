@@ -32,12 +32,12 @@ def list_accounts(project_id, show_id):
                 return
             items = sorted(items, key=lambda a: a.name.lower())
             if show_id:
-                rows = [[str(a.id), a.name, a.type.value, f"{a.initial_balance:.2f}", f"{a.current_balance:.2f}"] for a in items]
-                headers = ["ID", "Name", "Type", "Initial Balance", "Current Balance"]
+                rows = [[i + 1, str(a.id), a.name, a.type.value, float(a.initial_balance), float(a.current_balance)] for i, a in enumerate(items)]
+                headers = ["#", "ID", "Name", "Type", "Initial Balance", "Current Balance"]
             else:
-                rows = [[a.name, a.type.value, f"{a.initial_balance:.2f}", f"{a.current_balance:.2f}"] for a in items]
-                headers = ["Name", "Type", "Initial Balance", "Current Balance"]
-            click.echo(tabulate(rows, headers=headers, tablefmt="psql"))
+                rows = [[i + 1, a.name, a.type.value, float(a.initial_balance), float(a.current_balance)] for i, a in enumerate(items)]
+                headers = ["#", "Name", "Type", "Initial Balance", "Current Balance"]
+            click.echo(tabulate(rows, headers=headers, tablefmt="psql", floatfmt=".2f"))
 
     run_async(_run())
 
@@ -70,12 +70,26 @@ def create_account(name, account_type, project_id, initial_balance):
 @click.argument("account_id")
 @click.option("--name", default=None)
 @click.option("--type", "account_type", type=click.Choice(["credit", "debit"]), default=None)
-@click.option("--project", "project_id", default=None, help="Project UUID or name (required when ACCOUNT_ID is a name)")
-def edit_account(account_id, name, account_type, project_id):
-    """Edit an account. ACCOUNT_ID can be a UUID or account name."""
+@click.option("--initial-balance", "initial_balance", type=float, default=None, help="Set initial balance")
+@click.option("--current-balance", "current_balance", type=float, default=None, help="Set current balance")
+@click.option("--project", "project_id", default=None, help="Project UUID or name (required when ACCOUNT_ID is a name or counter)")
+def edit_account(account_id, name, account_type, initial_balance, current_balance, project_id):
+    """Edit an account. ACCOUNT_ID can be a UUID, name, or list counter (#)."""
     async def _run():
         async with get_session() as db:
-            if is_uuid(account_id):
+            if account_id.isdigit():
+                pid = await resolve_project_id(db, project_id)
+                if not pid:
+                    click.echo("Error: --project required when using account counter.", err=True)
+                    return
+                items = await account_service.list_accounts(db, pid)
+                items = sorted(items, key=lambda a: a.name.lower())
+                n = int(account_id)
+                if n < 1 or n > len(items):
+                    click.echo(f"Account #{n} not found in list.", err=True)
+                    return
+                aid = items[n - 1].id
+            elif is_uuid(account_id):
                 aid = uuid.UUID(account_id)
             else:
                 pid = await resolve_project_id(db, project_id)
@@ -87,7 +101,9 @@ def edit_account(account_id, name, account_type, project_id):
                     click.echo(f"Account not found: {account_id}", err=True)
                     return
             atype = AccountType(account_type) if account_type else None
-            a = await account_service.update_account(db, aid, AccountUpdate(name=name, type=atype))
+            a = await account_service.update_account(
+                db, aid, AccountUpdate(name=name, type=atype, initial_balance=initial_balance, current_balance=current_balance)
+            )
             if not a:
                 click.echo("Account not found.", err=True)
                 return
@@ -98,14 +114,28 @@ def edit_account(account_id, name, account_type, project_id):
 
 @account.command("delete")
 @click.argument("account_id")
-@click.option("--project", "project_id", default=None, help="Project UUID or name (required when ACCOUNT_ID is a name)")
-@click.confirmation_option(prompt="Delete this account?")
-def delete_account(account_id, project_id):
-    """Delete an account. ACCOUNT_ID can be a UUID or account name."""
+@click.option("--project", "project_id", default=None, help="Project UUID or name (required when ACCOUNT_ID is a name or counter)")
+@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
+def delete_account(account_id, project_id, yes):
+    """Delete an account. ACCOUNT_ID can be a UUID, name, or list counter (#)."""
     async def _run():
         async with get_session() as db:
-            if is_uuid(account_id):
+            if account_id.isdigit():
+                pid = await resolve_project_id(db, project_id)
+                if not pid:
+                    click.echo("Error: --project required when using account counter.", err=True)
+                    return
+                items = await account_service.list_accounts(db, pid)
+                items = sorted(items, key=lambda a: a.name.lower())
+                n = int(account_id)
+                if n < 1 or n > len(items):
+                    click.echo(f"Account #{n} not found in list.", err=True)
+                    return
+                aid = items[n - 1].id
+                prompt = f"Delete account #{n} (id: {aid})?"
+            elif is_uuid(account_id):
                 aid = uuid.UUID(account_id)
+                prompt = f"Delete account id: {aid}?"
             else:
                 pid = await resolve_project_id(db, project_id)
                 if not pid:
@@ -115,6 +145,11 @@ def delete_account(account_id, project_id):
                 if not aid:
                     click.echo(f"Account not found: {account_id}", err=True)
                     return
+                prompt = f"Delete account id: {aid}?"
+
+            if not yes:
+                click.confirm(prompt, abort=True)
+
             ok = await account_service.delete_account(db, aid)
             if not ok:
                 click.echo("Account not found.", err=True)

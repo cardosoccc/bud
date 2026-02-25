@@ -7,6 +7,7 @@ from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from bud.models.account import Account
 from bud.models.transaction import Transaction
 from bud.schemas.transaction import TransactionCreate, TransactionUpdate
 
@@ -47,6 +48,11 @@ async def get_transaction(db: AsyncSession, transaction_id: uuid.UUID) -> Option
     return result.scalar_one_or_none()
 
 
+async def _get_account(db: AsyncSession, account_id: uuid.UUID) -> Optional[Account]:
+    result = await db.execute(select(Account).where(Account.id == account_id))
+    return result.scalar_one_or_none()
+
+
 async def create_transaction(db: AsyncSession, data: TransactionCreate) -> Transaction:
     txn = Transaction(
         value=data.value,
@@ -58,6 +64,12 @@ async def create_transaction(db: AsyncSession, data: TransactionCreate) -> Trans
         tags=data.tags,
     )
     db.add(txn)
+    await db.flush()
+
+    account = await _get_account(db, data.account_id)
+    if account:
+        account.current_balance = Decimal(str(account.current_balance)) + data.value
+
     await db.commit()
     await db.refresh(txn)
     return txn
@@ -70,9 +82,29 @@ async def update_transaction(
     if not txn:
         return None
 
+    old_value = Decimal(str(txn.value))
+    old_account_id = txn.account_id
+
     update_data = data.model_dump(exclude_none=True)
     for field, value in update_data.items():
         setattr(txn, field, value)
+
+    new_value = Decimal(str(txn.value))
+    new_account_id = txn.account_id
+
+    if old_account_id == new_account_id:
+        diff = new_value - old_value
+        if diff:
+            account = await _get_account(db, old_account_id)
+            if account:
+                account.current_balance = Decimal(str(account.current_balance)) + diff
+    else:
+        old_account = await _get_account(db, old_account_id)
+        if old_account:
+            old_account.current_balance = Decimal(str(old_account.current_balance)) - old_value
+        new_account = await _get_account(db, new_account_id)
+        if new_account:
+            new_account.current_balance = Decimal(str(new_account.current_balance)) + new_value
 
     await db.commit()
     await db.refresh(txn)
@@ -83,6 +115,10 @@ async def delete_transaction(db: AsyncSession, transaction_id: uuid.UUID) -> boo
     txn = await get_transaction(db, transaction_id)
     if not txn:
         return False
+
+    account = await _get_account(db, txn.account_id)
+    if account:
+        account.current_balance = Decimal(str(account.current_balance)) - Decimal(str(txn.value))
 
     await db.delete(txn)
     await db.commit()

@@ -1,5 +1,6 @@
 """CLI configuration storage in ~/.bud/config.json."""
 import json
+from datetime import date
 from pathlib import Path
 from typing import Optional
 
@@ -33,8 +34,8 @@ def set_config_value(key: str, value) -> None:
     save_config(config)
 
 
-def get_active_month() -> Optional[str]:
-    return get_config_value("active_month")
+def get_active_month() -> str:
+    return get_config_value("active_month") or date.today().strftime("%Y-%m")
 
 
 def get_default_project_id() -> Optional[str]:

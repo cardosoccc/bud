@@ -533,3 +533,85 @@ async def test_delete_transaction_not_in_list_after_deletion(db_session: AsyncSe
 
     remaining = await transaction_service.list_transactions(db_session, project.id)
     assert all(r.id != t.id for r in remaining)
+
+
+# ---------------------------------------------------------------------------
+# account balance updates
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_create_transaction_decreases_balance_for_expense(db_session: AsyncSession):
+    project = await _create_project(db_session)
+    account = await _create_account(db_session, project.id)
+    assert Decimal(str(account.initial_balance)) == Decimal("0")
+
+    await _create_transaction(db_session, project.id, account.id, value=Decimal("-50.00"))
+
+    refreshed = await account_service.get_account(db_session, account.id)
+    assert Decimal(str(refreshed.current_balance)) == Decimal("-50.00")
+
+
+@pytest.mark.asyncio
+async def test_create_transaction_increases_balance_for_income(db_session: AsyncSession):
+    project = await _create_project(db_session)
+    account = await _create_account(db_session, project.id)
+
+    await _create_transaction(db_session, project.id, account.id, value=Decimal("1000.00"))
+
+    refreshed = await account_service.get_account(db_session, account.id)
+    assert Decimal(str(refreshed.current_balance)) == Decimal("1000.00")
+
+
+@pytest.mark.asyncio
+async def test_create_multiple_transactions_accumulate_balance(db_session: AsyncSession):
+    project = await _create_project(db_session)
+    account = await _create_account(db_session, project.id)
+
+    await _create_transaction(db_session, project.id, account.id, value=Decimal("500.00"))
+    await _create_transaction(db_session, project.id, account.id, value=Decimal("-120.00"))
+
+    refreshed = await account_service.get_account(db_session, account.id)
+    assert Decimal(str(refreshed.current_balance)) == Decimal("380.00")
+
+
+@pytest.mark.asyncio
+async def test_delete_transaction_restores_balance(db_session: AsyncSession):
+    project = await _create_project(db_session)
+    account = await _create_account(db_session, project.id)
+    t = await _create_transaction(db_session, project.id, account.id, value=Decimal("-50.00"))
+
+    await transaction_service.delete_transaction(db_session, t.id)
+
+    refreshed = await account_service.get_account(db_session, account.id)
+    assert Decimal(str(refreshed.current_balance)) == Decimal("0.00")
+
+
+@pytest.mark.asyncio
+async def test_update_transaction_value_adjusts_balance(db_session: AsyncSession):
+    project = await _create_project(db_session)
+    account = await _create_account(db_session, project.id)
+    t = await _create_transaction(db_session, project.id, account.id, value=Decimal("-50.00"))
+
+    await transaction_service.update_transaction(
+        db_session, t.id, TransactionUpdate(value=Decimal("-75.00"))
+    )
+
+    refreshed = await account_service.get_account(db_session, account.id)
+    assert Decimal(str(refreshed.current_balance)) == Decimal("-75.00")
+
+
+@pytest.mark.asyncio
+async def test_update_transaction_account_moves_balance(db_session: AsyncSession):
+    project = await _create_project(db_session)
+    account_a = await _create_account(db_session, project.id, name="AccountA")
+    account_b = await _create_account(db_session, project.id, name="AccountB")
+    t = await _create_transaction(db_session, project.id, account_a.id, value=Decimal("-100.00"))
+
+    await transaction_service.update_transaction(
+        db_session, t.id, TransactionUpdate(account_id=account_b.id)
+    )
+
+    refreshed_a = await account_service.get_account(db_session, account_a.id)
+    refreshed_b = await account_service.get_account(db_session, account_b.id)
+    assert Decimal(str(refreshed_a.current_balance)) == Decimal("0.00")
+    assert Decimal(str(refreshed_b.current_balance)) == Decimal("-100.00")

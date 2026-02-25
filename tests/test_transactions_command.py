@@ -236,11 +236,38 @@ def test_list_shows_table_headers(runner, cli_db):
         result = runner.invoke(transaction, ["list", "--month", "2025-01"])
 
     assert result.exit_code == 0
-    assert "ID" in result.output
+    assert "#" in result.output
     assert "Date" in result.output
     assert "Description" in result.output
     assert "Value" in result.output
     assert "Account" in result.output
+
+
+def test_list_does_not_show_uuid_by_default(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    tid, _ = asyncio.run(_seed_transaction(cli_db, pid, aid, txn_date=date(2025, 1, 10)))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, ["list", "--month", "2025-01"])
+
+    assert result.exit_code == 0
+    assert str(tid) not in result.output
+
+
+def test_list_shows_uuid_with_show_id_flag(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    tid, _ = asyncio.run(_seed_transaction(cli_db, pid, aid, txn_date=date(2025, 1, 10)))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, ["list", "--month", "2025-01", "--show-id"])
+
+    assert result.exit_code == 0
+    assert "ID" in result.output
+    assert str(tid) in result.output
 
 
 def test_list_shows_account_name(runner, cli_db):
@@ -354,15 +381,18 @@ def test_list_uses_default_month(runner, cli_db):
     assert "MarchTx" in result.output
 
 
-def test_list_no_month_no_default_shows_error(runner, cli_db):
+def test_list_no_month_defaults_to_current_month(runner, cli_db):
+    from datetime import date
     pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    current_month = date.today().strftime("%Y-%m")
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)), \
-         patch("bud.commands.utils.get_active_month", return_value=None):
+         patch("bud.commands.utils.get_active_month", return_value=current_month):
         result = runner.invoke(transaction, ["list"])
 
-    assert "Error" in result.output or "Error" in result.stderr
+    assert result.exit_code == 0
+    assert "Error" not in result.output and "Error" not in result.stderr
 
 
 # ---------------------------------------------------------------------------
@@ -1078,6 +1108,64 @@ def test_delete_leaves_other_transactions_intact(runner, cli_db):
     ids = [t.id for t in txns]
     assert tid1 in ids
     assert tid2 not in ids
+
+
+def test_delete_by_counter_deletes_correct_transaction(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    # list is ordered date desc; seed with different dates so order is deterministic
+    tid1, _ = asyncio.run(_seed_transaction(cli_db, pid, aid, description="First", txn_date=date(2025, 1, 20)))
+    tid2, _ = asyncio.run(_seed_transaction(cli_db, pid, aid, description="Second", txn_date=date(2025, 1, 10)))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, ["delete", "1", "--month", "2025-01", "--yes"])
+
+    assert result.exit_code == 0
+    assert "Transaction deleted." in result.output
+    txns = asyncio.run(_fetch_all_transactions(cli_db, pid))
+    ids = [t.id for t in txns]
+    assert tid1 not in ids  # #1 = most recent (2025-01-20)
+    assert tid2 in ids
+
+
+def test_delete_by_counter_confirmation_shows_counter_and_id(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    tid, _ = asyncio.run(_seed_transaction(cli_db, pid, aid, txn_date=date(2025, 1, 15)))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, ["delete", "1", "--month", "2025-01"], input="n\n")
+
+    assert "#1" in result.output
+    assert str(tid) in result.output
+
+
+def test_delete_by_counter_out_of_range(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    asyncio.run(_seed_transaction(cli_db, pid, aid, txn_date=date(2025, 1, 15)))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, ["delete", "99", "--month", "2025-01", "--yes"])
+
+    assert result.exit_code == 0
+    assert "not found" in result.stderr
+
+
+def test_list_shows_counter_column(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    asyncio.run(_seed_transaction(cli_db, pid, aid, txn_date=date(2025, 1, 15)))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, ["list", "--month", "2025-01"])
+
+    assert result.exit_code == 0
+    assert "1" in result.output  # counter value
 
 
 # ---------------------------------------------------------------------------

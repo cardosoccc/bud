@@ -508,6 +508,46 @@ def test_edit_by_name_no_project_shows_error(runner, cli_db):
     assert "--project required" in result.stderr
 
 
+def test_edit_initial_balance(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "BalanceAcc", initial_balance=100.0))
+
+    with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)):
+        result = runner.invoke(account, ["edit", str(aid), "--initial-balance", "250"])
+
+    assert result.exit_code == 0
+    accounts = asyncio.run(_fetch_all_accounts(cli_db, pid))
+    acc = next(a for a in accounts if a.id == aid)
+    assert float(acc.initial_balance) == 250.0
+
+
+def test_edit_current_balance(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "CurrBalAcc", initial_balance=50.0))
+
+    with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)):
+        result = runner.invoke(account, ["edit", str(aid), "--current-balance", "999"])
+
+    assert result.exit_code == 0
+    accounts = asyncio.run(_fetch_all_accounts(cli_db, pid))
+    acc = next(a for a in accounts if a.id == aid)
+    assert float(acc.current_balance) == 999.0
+
+
+def test_edit_both_balances(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "BothBalAcc"))
+
+    with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)):
+        result = runner.invoke(account, ["edit", str(aid), "--initial-balance", "10", "--current-balance", "20"])
+
+    assert result.exit_code == 0
+    accounts = asyncio.run(_fetch_all_accounts(cli_db, pid))
+    acc = next(a for a in accounts if a.id == aid)
+    assert float(acc.initial_balance) == 10.0
+    assert float(acc.current_balance) == 20.0
+
+
 def test_edit_by_name_not_found_in_project(runner, cli_db):
     pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
 

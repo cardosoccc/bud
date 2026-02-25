@@ -16,11 +16,7 @@ def require_project_id(project_id: str = None) -> uuid.UUID:
 
 
 def require_month(month: str = None) -> str:
-    m = month or get_active_month()
-    if not m:
-        click.echo("Error: no month specified. Use --month or set active month with `bud config set-month`.", err=True)
-        sys.exit(1)
-    return m
+    return month or get_active_month()
 
 
 def is_uuid(s: str) -> bool:
