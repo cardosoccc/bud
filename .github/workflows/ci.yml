@@ -54,4 +54,4 @@ jobs:
         run: uv sync --all-groups
 
       - name: Run integration tests
-        run: uv run pytest tests/ -v -m "integration"
+        run: uv run pytest tests/ -v -m "integration" || [ "$?" = "5" ]
