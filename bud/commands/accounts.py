@@ -29,8 +29,8 @@ def list_accounts(project_id):
             if not items:
                 click.echo("No accounts found.")
                 return
-            rows = [[str(a.id), a.name, a.type.value] for a in items]
-            click.echo(tabulate(rows, headers=["ID", "Name", "Type"], tablefmt="psql"))
+            rows = [[str(a.id), a.name, a.type.value, f"{a.initial_balance:.2f}", f"{a.current_balance:.2f}"] for a in items]
+            click.echo(tabulate(rows, headers=["ID", "Name", "Type", "Initial Balance", "Current Balance"], tablefmt="psql"))
 
     run_async(_run())
 
@@ -39,7 +39,8 @@ def list_accounts(project_id):
 @click.option("--name", required=True)
 @click.option("--type", "account_type", type=click.Choice(["credit", "debit", "nil"]), default="debit")
 @click.option("--project", "project_id", default=None, help="Project UUID or name")
-def create_account(name, account_type, project_id):
+@click.option("--initial-balance", "initial_balance", type=float, default=0, help="Initial balance (default: 0)")
+def create_account(name, account_type, project_id, initial_balance):
     """Create a new account."""
     async def _run():
         async with get_session() as db:
@@ -49,7 +50,7 @@ def create_account(name, account_type, project_id):
                 return
             try:
                 a = await account_service.create_account(
-                    db, AccountCreate(name=name, type=AccountType(account_type), project_id=pid)
+                    db, AccountCreate(name=name, type=AccountType(account_type), project_id=pid, initial_balance=initial_balance)
                 )
                 click.echo(f"Created account: {a.name} ({a.type.value}) id: {a.id}")
             except ValueError as e:

@@ -10,12 +10,15 @@ class AccountCreate(BaseModel):
     name: str
     type: AccountType = AccountType.debit
     project_id: uuid.UUID
+    initial_balance: float = 0
 
 
 class AccountRead(BaseModel):
     id: uuid.UUID
     name: str
     type: AccountType
+    initial_balance: float
+    current_balance: float
 
     model_config = {"from_attributes": True}
 
