@@ -24,6 +24,8 @@ class ForecastActual(BaseModel):
     category_id: Optional[uuid.UUID] = None
     category_name: Optional[str] = None
     tags: List[str] = []
+    installment: Optional[int] = None
+    total_installments: Optional[int] = None
 
 
 class ReportRead(BaseModel):

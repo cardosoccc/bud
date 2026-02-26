@@ -4,6 +4,7 @@ from bud.models.category import Category
 from bud.models.transaction import Transaction
 from bud.models.budget import Budget
 from bud.models.forecast import Forecast
+from bud.models.recurrence import Recurrence
 
 __all__ = [
     "Project",
@@ -14,4 +15,5 @@ __all__ = [
     "Transaction",
     "Budget",
     "Forecast",
+    "Recurrence",
 ]

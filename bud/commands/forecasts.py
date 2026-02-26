@@ -1,4 +1,6 @@
 import uuid
+from decimal import Decimal
+
 import click
 from tabulate import tabulate
 
@@ -7,9 +9,11 @@ from bud.commands.utils import resolve_project_id, resolve_category_id, resolve_
 from bud.schemas.budget import BudgetCreate
 from bud.schemas.category import CategoryCreate
 from bud.schemas.forecast import ForecastCreate, ForecastUpdate
+from bud.schemas.recurrence import RecurrenceCreate
 from bud.services import budgets as budget_service
 from bud.services import categories as category_service
 from bud.services import forecasts as forecast_service
+from bud.services import recurrences as recurrence_service
 
 
 @click.group()
@@ -90,12 +94,26 @@ def list_forecasts(budget_id, project_id, show_id):
             if not items:
                 click.echo("No forecasts found.")
                 return
+
+            def _display_description(f):
+                desc = f.description or ""
+                if f.installment is not None and f.recurrence and f.recurrence.installments:
+                    desc = f"{desc} ({f.installment}/{f.recurrence.installments})".strip()
+                return desc
+
+            def _recurrence_label(f):
+                if f.recurrence_id is None:
+                    return ""
+                if f.installment is not None:
+                    return f"{f.installment}/{f.recurrence.installments}" if f.recurrence and f.recurrence.installments else str(f.installment)
+                return "Yes"
+
             if show_id:
-                rows = [[i + 1, str(f.id), f.description or "", f.value, f.category.name if f.category else "", ", ".join(f.tags) if f.tags else "", "Yes" if f.is_recurrent else ""] for i, f in enumerate(items)]
-                headers = ["#", "ID", "Description", "Value", "Category", "Tags", "Recurrent"]
+                rows = [[i + 1, str(f.id), _display_description(f), f.value, f.category.name if f.category else "", ", ".join(f.tags) if f.tags else "", _recurrence_label(f)] for i, f in enumerate(items)]
+                headers = ["#", "ID", "Description", "Value", "Category", "Tags", "Recurrence"]
             else:
-                rows = [[i + 1, f.description or "", f.value, f.category.name if f.category else "", ", ".join(f.tags) if f.tags else "", "Yes" if f.is_recurrent else ""] for i, f in enumerate(items)]
-                headers = ["#", "Description", "Value", "Category", "Tags", "Recurrent"]
+                rows = [[i + 1, _display_description(f), f.value, f.category.name if f.category else "", ", ".join(f.tags) if f.tags else "", _recurrence_label(f)] for i, f in enumerate(items)]
+                headers = ["#", "Description", "Value", "Category", "Tags", "Recurrence"]
             click.echo(tabulate(rows, headers=headers, tablefmt="psql", floatfmt=".2f"))
 
     run_async(_run())
@@ -107,9 +125,12 @@ def list_forecasts(budget_id, project_id, show_id):
 @click.option("--value", required=True, type=float)
 @click.option("--category", "category_id", default=None, help="Category UUID or name")
 @click.option("--tags", default=None, help="Comma-separated tags")
-@click.option("--recurrent", is_flag=True, default=False)
+@click.option("--recurrent", is_flag=True, default=False, help="Mark as recurrent")
+@click.option("--recurrence-end", default=None, help="Last month for recurrence (YYYY-MM)")
+@click.option("--installments", type=int, default=None, help="Number of installments")
+@click.option("--current-installment", type=int, default=None, help="Current installment number (e.g. 5 means this is the 5th of N)")
 @click.option("--project", "project_id", default=None, help="Project UUID or name")
-def create_forecast(budget_id, description, value, category_id, tags, recurrent, project_id):
+def create_forecast(budget_id, description, value, category_id, tags, recurrent, recurrence_end, installments, current_installment, project_id):
     """Create a forecast. Budget defaults to the current month and is auto-created if missing.
 
     At least one of --description, --category, or --tags must be provided.
@@ -135,16 +156,131 @@ def create_forecast(budget_id, description, value, category_id, tags, recurrent,
                     click.echo(f"Created category: {new_cat.name}")
                     cat = new_cat.id
 
-            f = await forecast_service.create_forecast(db, ForecastCreate(
-                description=description,
-                value=value,
-                budget_id=bid,
-                category_id=cat,
-                tags=tag_list,
-                is_recurrent=recurrent,
-            ))
-            label = f.description or f"id: {f.id}"
-            click.echo(f"Created forecast: {label} ({f.value})")
+            # Resolve the budget to get its month name and project_id
+            budget_obj = await budget_service.get_budget(db, bid)
+
+            is_recurrent = recurrent or recurrence_end is not None or installments is not None
+
+            if current_installment is not None and not installments:
+                click.echo("Error: --current-installment requires --installments.", err=True)
+                return
+            if current_installment is not None and (current_installment < 1 or current_installment > installments):
+                click.echo(f"Error: --current-installment must be between 1 and {installments}.", err=True)
+                return
+
+            if is_recurrent and installments:
+                first_inst = current_installment or 1
+
+                # Installment-based: create original forecast with base description (no suffix)
+                first_forecast = await forecast_service.create_forecast(db, ForecastCreate(
+                    description=description,
+                    value=value,
+                    budget_id=bid,
+                    category_id=cat,
+                    tags=tag_list,
+                    installment=first_inst,
+                ))
+
+                # Calculate theoretical start (month where installment 1 would have been)
+                theoretical_start = recurrence_service._month_offset(budget_obj.name, -(first_inst - 1))
+
+                # Create recurrence referencing the original forecast
+                rec = await recurrence_service.create_recurrence(db, RecurrenceCreate(
+                    start=theoretical_start,
+                    installments=installments,
+                    base_description=description,
+                    original_forecast_id=first_forecast.id,
+                    project_id=budget_obj.project_id,
+                ))
+
+                # Link first forecast to recurrence
+                first_forecast.recurrence_id = rec.id
+                await db.commit()
+
+                # Create remaining installments
+                for i in range(first_inst + 1, installments + 1):
+                    month = recurrence_service._month_offset(budget_obj.name, i - first_inst)
+                    target_budget = await budget_service.get_budget_by_name(db, budget_obj.project_id, month)
+                    if not target_budget:
+                        target_budget = await budget_service.create_budget(
+                            db, BudgetCreate(name=month, project_id=budget_obj.project_id)
+                        )
+                        # create_budget calls _populate_recurrent_forecasts which may
+                        # have already created this forecast
+                        already = await forecast_service.forecast_exists_for_recurrence(db, rec.id, target_budget.id)
+                        if already:
+                            continue
+
+                    await forecast_service.create_forecast(db, ForecastCreate(
+                        description=description,
+                        value=value,
+                        budget_id=target_budget.id,
+                        category_id=cat,
+                        tags=tag_list,
+                        recurrence_id=rec.id,
+                        installment=i,
+                    ))
+
+                label = description or f"id: {first_forecast.id}"
+                remaining = installments - first_inst + 1
+                click.echo(f"Created recurrent forecast: {label} ({remaining} installments, {first_inst}/{installments} to {installments}/{installments})")
+
+            elif is_recurrent:
+                # Open-ended or end-bounded recurrence
+                first_forecast = await forecast_service.create_forecast(db, ForecastCreate(
+                    description=description,
+                    value=value,
+                    budget_id=bid,
+                    category_id=cat,
+                    tags=tag_list,
+                ))
+
+                rec = await recurrence_service.create_recurrence(db, RecurrenceCreate(
+                    start=budget_obj.name,
+                    end=recurrence_end,
+                    base_description=description,
+                    original_forecast_id=first_forecast.id,
+                    project_id=budget_obj.project_id,
+                ))
+
+                # Link first forecast to recurrence
+                first_forecast.recurrence_id = rec.id
+                await db.commit()
+
+                # Create forecasts in existing budgets within range
+                all_budgets = await budget_service.list_budgets(db, budget_obj.project_id)
+                for b in all_budgets:
+                    if b.name <= budget_obj.name:
+                        continue
+                    if recurrence_end and b.name > recurrence_end:
+                        continue
+                    already = await forecast_service.forecast_exists_for_recurrence(db, rec.id, b.id)
+                    if already:
+                        continue
+                    await forecast_service.create_forecast(db, ForecastCreate(
+                        description=description,
+                        value=value,
+                        budget_id=b.id,
+                        category_id=cat,
+                        tags=tag_list,
+                        recurrence_id=rec.id,
+                    ))
+
+                label = description or f"id: {first_forecast.id}"
+                end_info = f" until {recurrence_end}" if recurrence_end else ""
+                click.echo(f"Created recurrent forecast: {label} ({value}){end_info}")
+
+            else:
+                # Simple non-recurrent forecast
+                f = await forecast_service.create_forecast(db, ForecastCreate(
+                    description=description,
+                    value=value,
+                    budget_id=bid,
+                    category_id=cat,
+                    tags=tag_list,
+                ))
+                label = f.description or f"id: {f.id}"
+                click.echo(f"Created forecast: {label} ({f.value})")
 
     run_async(_run())
 
@@ -156,9 +292,11 @@ def create_forecast(budget_id, description, value, category_id, tags, recurrent,
 @click.option("--value", type=float, default=None)
 @click.option("--category", "category_id", default=None, help="Category UUID or name")
 @click.option("--tags", default=None)
+@click.option("--recurrent", is_flag=True, default=False, help="Turn into a recurrent forecast")
+@click.option("--recurrence-end", default=None, help="Last month for recurrence (YYYY-MM)")
 @click.option("--budget", "budget_id", default=None, help="Budget UUID or month name; defaults to current month")
 @click.option("--project", "project_id", default=None, help="Project UUID or name (required when --budget is a month name)")
-def edit_forecast(counter, record_id, description, value, category_id, tags, budget_id, project_id):
+def edit_forecast(counter, record_id, description, value, category_id, tags, recurrent, recurrence_end, budget_id, project_id):
     """Edit a forecast. Specify by list counter (default) or --id."""
     async def _run():
         tag_list = [t.strip() for t in tags.split(",")] if tags else None
@@ -207,7 +345,59 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, bud
             if not f:
                 click.echo("Forecast not found.", err=True)
                 return
-            click.echo(f"Updated forecast: {f.description}")
+
+            # If description changed on a recurrent forecast, update the recurrence's base_description
+            if description is not None and f.recurrence_id is not None:
+                from bud.services.recurrences import get_recurrence
+                rec = await get_recurrence(db, f.recurrence_id)
+                if rec:
+                    rec.base_description = description
+                    await db.commit()
+
+            is_recurrent = recurrent or recurrence_end is not None
+            if is_recurrent:
+                if f.recurrence_id is not None:
+                    click.echo("Error: forecast is already recurrent.", err=True)
+                    return
+
+                budget_obj = await budget_service.get_budget(db, f.budget_id)
+
+                rec = await recurrence_service.create_recurrence(db, RecurrenceCreate(
+                    start=budget_obj.name,
+                    end=recurrence_end,
+                    base_description=f.description,
+                    original_forecast_id=f.id,
+                    project_id=budget_obj.project_id,
+                ))
+
+                f.recurrence_id = rec.id
+                await db.commit()
+
+                # Create forecasts in existing budgets within range
+                all_budgets = await budget_service.list_budgets(db, budget_obj.project_id)
+                created = 0
+                for b in all_budgets:
+                    if b.name <= budget_obj.name:
+                        continue
+                    if recurrence_end and b.name > recurrence_end:
+                        continue
+                    already = await forecast_service.forecast_exists_for_recurrence(db, rec.id, b.id)
+                    if already:
+                        continue
+                    await forecast_service.create_forecast(db, ForecastCreate(
+                        description=f.description,
+                        value=Decimal(str(f.value)),
+                        budget_id=b.id,
+                        category_id=f.category_id,
+                        tags=f.tags or [],
+                        recurrence_id=rec.id,
+                    ))
+                    created += 1
+
+                end_info = f" until {recurrence_end}" if recurrence_end else ""
+                click.echo(f"Updated forecast: {f.description} (now recurrent{end_info}, {created} forecasts added)")
+            else:
+                click.echo(f"Updated forecast: {f.description}")
 
     run_async(_run())
 

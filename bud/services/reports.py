@@ -95,7 +95,7 @@ async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
     forecasts_result = await db.execute(
         select(Forecast)
         .where(Forecast.budget_id == budget_id)
-        .options(selectinload(Forecast.category))
+        .options(selectinload(Forecast.category), selectinload(Forecast.recurrence))
     )
     forecasts = list(forecasts_result.scalars().all())
 
@@ -116,6 +116,10 @@ async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
             actual = Decimal("0")
 
         forecast_val = Decimal(str(forecast.value))
+        total_installments = None
+        if forecast.recurrence and forecast.recurrence.installments:
+            total_installments = forecast.recurrence.installments
+
         forecast_actuals.append(
             ForecastActual(
                 forecast_id=forecast.id,
@@ -126,6 +130,8 @@ async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
                 category_id=forecast.category_id,
                 category_name=forecast.category.name if forecast.category else None,
                 tags=forecast.tags or [],
+                installment=forecast.installment,
+                total_installments=total_installments,
             )
         )
 
@@ -194,15 +200,6 @@ async def _calculate_accumulated_remaining(
             budget_txns = list(txns_result.scalars().all())
 
             for f in budget_forecasts:
-                if f.is_recurrent:
-                    applies = True
-                    if f.recurrent_start and b.start_date < f.recurrent_start:
-                        applies = False
-                    if f.recurrent_end and b.end_date > f.recurrent_end:
-                        applies = False
-                    if not applies:
-                        continue
-
                 forecast_val = Decimal(str(f.value))
 
                 # Calculate actual for this forecast
@@ -253,19 +250,7 @@ async def _calculate_projected_net_balance(
             )
             budget_forecasts = list(forecasts_result.scalars().all())
 
-            # Net forecast: positive = earnings, negative = expenses
-            # Use the sum of forecast values as the net projected change
             for f in budget_forecasts:
-                # Check if this recurrent forecast applies to this month
-                if f.is_recurrent:
-                    applies = True
-                    if f.recurrent_start and b.start_date < f.recurrent_start:
-                        applies = False
-                    if f.recurrent_end and b.end_date > f.recurrent_end:
-                        applies = False
-                    if applies:
-                        cumulative += Decimal(str(f.value))
-                else:
-                    cumulative += Decimal(str(f.value))
+                cumulative += Decimal(str(f.value))
 
     return cumulative

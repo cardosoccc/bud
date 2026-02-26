@@ -109,8 +109,14 @@ def report(budget_id, project_id):
                 click.echo(f"\n{table}\n{total_row}\n{b}\n{expected_row}\n{b}")
 
             if r.forecasts or (r.is_projected and r.accumulated_remaining is not None):
+                def _display_desc(f):
+                    desc = f.description or ""
+                    if f.installment is not None and f.total_installments is not None:
+                        desc = f"{desc} ({f.installment}/{f.total_installments})".strip()
+                    return desc
+
                 rows = [
-                    [f.description or "", f.category_name or "", ", ".join(f.tags) if f.tags else "", f.forecast_value, f.actual_value, f.difference]
+                    [_display_desc(f), f.category_name or "", ", ".join(f.tags) if f.tags else "", f.forecast_value, f.actual_value, f.difference]
                     for f in r.forecasts
                 ]
                 total_forecasted = sum(f.forecast_value for f in r.forecasts)

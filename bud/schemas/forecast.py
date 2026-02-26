@@ -1,5 +1,5 @@
 import uuid
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional, List
 
@@ -12,9 +12,8 @@ class ForecastCreate(BaseModel):
     budget_id: uuid.UUID
     category_id: Optional[uuid.UUID] = None
     tags: List[str] = []
-    is_recurrent: bool = False
-    recurrent_start: Optional[date] = None
-    recurrent_end: Optional[date] = None
+    recurrence_id: Optional[uuid.UUID] = None
+    installment: Optional[int] = None
 
 
 class ForecastRead(BaseModel):
@@ -24,9 +23,8 @@ class ForecastRead(BaseModel):
     budget_id: uuid.UUID
     category_id: Optional[uuid.UUID] = None
     tags: List[str] = []
-    is_recurrent: bool
-    recurrent_start: Optional[date] = None
-    recurrent_end: Optional[date] = None
+    recurrence_id: Optional[uuid.UUID] = None
+    installment: Optional[int] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -37,6 +35,3 @@ class ForecastUpdate(BaseModel):
     value: Optional[Decimal] = None
     category_id: Optional[uuid.UUID] = None
     tags: Optional[List[str]] = None
-    is_recurrent: Optional[bool] = None
-    recurrent_start: Optional[date] = None
-    recurrent_end: Optional[date] = None

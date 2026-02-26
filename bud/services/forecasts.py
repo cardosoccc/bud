@@ -13,7 +13,7 @@ async def list_forecasts(db: AsyncSession, budget_id: uuid.UUID) -> List[Forecas
     result = await db.execute(
         select(Forecast)
         .where(Forecast.budget_id == budget_id)
-        .options(selectinload(Forecast.category))
+        .options(selectinload(Forecast.category), selectinload(Forecast.recurrence))
         .order_by(Forecast.created_at)
     )
     return list(result.scalars().all())
@@ -31,9 +31,8 @@ async def create_forecast(db: AsyncSession, data: ForecastCreate) -> Forecast:
         budget_id=data.budget_id,
         category_id=data.category_id,
         tags=data.tags,
-        is_recurrent=data.is_recurrent,
-        recurrent_start=data.recurrent_start,
-        recurrent_end=data.recurrent_end,
+        recurrence_id=data.recurrence_id,
+        installment=data.installment,
     )
     db.add(forecast)
     await db.commit()
@@ -59,3 +58,15 @@ async def delete_forecast(db: AsyncSession, forecast_id: uuid.UUID) -> bool:
     await db.delete(forecast)
     await db.commit()
     return True
+
+
+async def forecast_exists_for_recurrence(
+    db: AsyncSession, recurrence_id: uuid.UUID, budget_id: uuid.UUID
+) -> bool:
+    result = await db.execute(
+        select(Forecast.id).where(
+            Forecast.recurrence_id == recurrence_id,
+            Forecast.budget_id == budget_id,
+        )
+    )
+    return result.scalar_one_or_none() is not None
