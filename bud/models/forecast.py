@@ -13,7 +13,7 @@ class Forecast(Base):
     __tablename__ = "forecasts"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    description: Mapped[str] = mapped_column(String(500), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     value: Mapped[Decimal] = mapped_column(Numeric(precision=15, scale=2), nullable=False)
     min_value: Mapped[Optional[Decimal]] = mapped_column(Numeric(precision=15, scale=2), nullable=True)
     max_value: Mapped[Optional[Decimal]] = mapped_column(Numeric(precision=15, scale=2), nullable=True)

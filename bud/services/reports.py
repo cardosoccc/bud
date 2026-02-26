@@ -5,6 +5,7 @@ from typing import List
 
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from bud.models.budget import Budget
 from bud.models.forecast import Forecast
@@ -72,18 +73,25 @@ async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
 
     # Get forecasts and compute actuals
     forecasts_result = await db.execute(
-        select(Forecast).where(Forecast.budget_id == budget_id)
+        select(Forecast)
+        .where(Forecast.budget_id == budget_id)
+        .options(selectinload(Forecast.category))
     )
     forecasts = list(forecasts_result.scalars().all())
 
     forecast_actuals = []
     for forecast in forecasts:
-        if forecast.category_id:
-            actual = sum(
-                Decimal(str(t.value))
-                for t in transactions
-                if t.category_id == forecast.category_id
-            )
+        has_criteria = forecast.description or forecast.category_id or forecast.tags
+        if has_criteria:
+            actual = Decimal("0")
+            for t in transactions:
+                if forecast.category_id and t.category_id != forecast.category_id:
+                    continue
+                if forecast.description and forecast.description.lower() not in t.description.lower():
+                    continue
+                if forecast.tags and not all(tag in (t.tags or []) for tag in forecast.tags):
+                    continue
+                actual += Decimal(str(t.value))
         else:
             actual = Decimal("0")
 
@@ -94,8 +102,10 @@ async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
                 description=forecast.description,
                 forecast_value=forecast_val,
                 actual_value=actual,
-                difference=actual - forecast_val,
+                difference=forecast_val - actual,
                 category_id=forecast.category_id,
+                category_name=forecast.category.name if forecast.category else None,
+                tags=forecast.tags or [],
             )
         )
 

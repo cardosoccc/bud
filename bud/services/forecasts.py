@@ -3,6 +3,7 @@ from typing import Optional, List
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from bud.models.forecast import Forecast
 from bud.schemas.forecast import ForecastCreate, ForecastUpdate
@@ -10,7 +11,10 @@ from bud.schemas.forecast import ForecastCreate, ForecastUpdate
 
 async def list_forecasts(db: AsyncSession, budget_id: uuid.UUID) -> List[Forecast]:
     result = await db.execute(
-        select(Forecast).where(Forecast.budget_id == budget_id).order_by(Forecast.created_at)
+        select(Forecast)
+        .where(Forecast.budget_id == budget_id)
+        .options(selectinload(Forecast.category))
+        .order_by(Forecast.created_at)
     )
     return list(result.scalars().all())
 

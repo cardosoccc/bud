@@ -14,11 +14,13 @@ class AccountBalance(BaseModel):
 
 class ForecastActual(BaseModel):
     forecast_id: uuid.UUID
-    description: str
+    description: Optional[str] = None
     forecast_value: Decimal
     actual_value: Decimal
     difference: Decimal
     category_id: Optional[uuid.UUID] = None
+    category_name: Optional[str] = None
+    tags: List[str] = []
 
 
 class ReportRead(BaseModel):

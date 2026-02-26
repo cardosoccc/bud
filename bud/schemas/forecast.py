@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 
 class ForecastCreate(BaseModel):
-    description: str
+    description: Optional[str] = None
     value: Decimal
     budget_id: uuid.UUID
     category_id: Optional[uuid.UUID] = None
@@ -21,7 +21,7 @@ class ForecastCreate(BaseModel):
 
 class ForecastRead(BaseModel):
     id: uuid.UUID
-    description: str
+    description: Optional[str] = None
     value: Decimal
     budget_id: uuid.UUID
     category_id: Optional[uuid.UUID] = None

@@ -55,9 +55,25 @@ def report(budget_id, project_id):
 
             if r.forecasts:
                 rows = [
-                    [f.description, f.forecast_value, f.actual_value, f.difference]
+                    [f.description or "", f.category_name or "", ", ".join(f.tags) if f.tags else "", f.forecast_value, f.actual_value, f.difference]
                     for f in r.forecasts
                 ]
-                click.echo(f"\n{tabulate(rows, headers=["Description", "Forecast", "Actual", "Difference"], tablefmt="psql", floatfmt=".2f")}")
+                total_forecasted = sum(f.forecast_value for f in r.forecasts)
+                total_current = sum(f.actual_value for f in r.forecasts)
+                total_remaining = sum(f.difference for f in r.forecasts)
+                table = tabulate(rows, headers=["Description", "Category", "Tags", "Forecast", "Current", "Remaining"], tablefmt="psql", floatfmt=".2f")
+                lines = table.split("\n")
+                border = lines[0]  # e.g. +-----+-----+...+
+                # Column widths from border segments between +
+                segments = border.split("+")[1:-1]
+                widths = [len(s) for s in segments]
+                cells = [" " * w for w in widths]
+                cells[0] = " Total".ljust(widths[0])
+                cells[3] = f"{total_forecasted:.2f}".rjust(widths[3] - 1) + " "
+                cells[4] = f"{total_current:.2f}".rjust(widths[4] - 1) + " "
+                cells[5] = f"{total_remaining:.2f}".rjust(widths[5] - 1) + " "
+                footer_row = "|" + "|".join(cells) + "|"
+                # footer_border = border.replace("-", "=")
+                click.echo(f"\n{table}\n{footer_row}\n{border}")
 
     run_async(_run())
