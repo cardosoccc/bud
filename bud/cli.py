@@ -101,6 +101,7 @@ config.add_command(configure_gcp)
 _crud_aliases = {"e": "edit", "c": "create", "d": "delete", "l": "list"}
 for _grp in (account, budget, category, transaction, project, forecast):
     _add_subcommand_aliases(_grp, _crud_aliases)
+_add_subcommand_aliases(transaction, {"s": "show"})
 _add_subcommand_aliases(project, {"s": "set-default"})
 _add_subcommand_aliases(config, {"s": "set"})
 

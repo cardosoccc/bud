@@ -412,7 +412,7 @@ def test_show_displays_transaction_details(runner, cli_db):
     )
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(transaction, ["show", str(tid)])
+        result = runner.invoke(transaction, ["show", "--id", str(tid)])
 
     assert result.exit_code == 0
     assert "Electric Bill" in result.output
@@ -428,7 +428,7 @@ def test_show_displays_date(runner, cli_db):
     )
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(transaction, ["show", str(tid)])
+        result = runner.invoke(transaction, ["show", "--id", str(tid)])
 
     assert result.exit_code == 0
     assert "2025-06-15" in result.output
@@ -442,7 +442,7 @@ def test_show_displays_value(runner, cli_db):
     )
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(transaction, ["show", str(tid)])
+        result = runner.invoke(transaction, ["show", "--id", str(tid)])
 
     assert result.exit_code == 0
     assert "500" in result.output
@@ -456,7 +456,7 @@ def test_show_displays_tags(runner, cli_db):
     )
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(transaction, ["show", str(tid)])
+        result = runner.invoke(transaction, ["show", "--id", str(tid)])
 
     assert result.exit_code == 0
     assert "food" in result.output
@@ -472,7 +472,7 @@ def test_show_displays_category_id(runner, cli_db):
     )
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(transaction, ["show", str(tid)])
+        result = runner.invoke(transaction, ["show", "--id", str(tid)])
 
     assert result.exit_code == 0
     assert str(cid) in result.output
@@ -486,7 +486,7 @@ def test_show_no_tags_displays_dash(runner, cli_db):
     )
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(transaction, ["show", str(tid)])
+        result = runner.invoke(transaction, ["show", "--id", str(tid)])
 
     assert result.exit_code == 0
     assert "Tags:" in result.output
@@ -496,7 +496,7 @@ def test_show_not_found(runner, cli_db):
     fake_id = str(uuid.uuid4())
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(transaction, ["show", fake_id])
+        result = runner.invoke(transaction, ["show", "--id", fake_id])
 
     assert result.exit_code == 0
     assert "Transaction not found" in result.stderr
@@ -508,7 +508,7 @@ def test_show_displays_field_labels(runner, cli_db):
     tid, _ = asyncio.run(_seed_transaction(cli_db, pid, aid, txn_date=date(2025, 1, 5)))
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(transaction, ["show", str(tid)])
+        result = runner.invoke(transaction, ["show", "--id", str(tid)])
 
     assert result.exit_code == 0
     assert "ID:" in result.output
@@ -518,6 +518,74 @@ def test_show_displays_field_labels(runner, cli_db):
     assert "Account:" in result.output
     assert "Category:" in result.output
     assert "Tags:" in result.output
+
+
+def test_show_by_counter(runner, cli_db):
+    """Show a transaction using the incremental counter from the list."""
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    asyncio.run(_seed_transaction(cli_db, pid, aid, description="First", txn_date=date(2025, 1, 20)))
+    asyncio.run(_seed_transaction(cli_db, pid, aid, description="Second", txn_date=date(2025, 1, 10)))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, ["show", "1", "--month", "2025-01"])
+
+    assert result.exit_code == 0
+    assert "First" in result.output
+
+
+def test_show_by_counter_second_item(runner, cli_db):
+    """Counter 2 picks the second transaction in the list."""
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    asyncio.run(_seed_transaction(cli_db, pid, aid, description="First", txn_date=date(2025, 1, 20)))
+    asyncio.run(_seed_transaction(cli_db, pid, aid, description="Second", txn_date=date(2025, 1, 10)))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, ["show", "2", "--month", "2025-01"])
+
+    assert result.exit_code == 0
+    assert "Second" in result.output
+
+
+def test_show_counter_out_of_range(runner, cli_db):
+    """Counter beyond the list length produces an error."""
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    asyncio.run(_seed_transaction(cli_db, pid, aid, txn_date=date(2025, 1, 10)))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, ["show", "99", "--month", "2025-01"])
+
+    assert result.exit_code == 0
+    assert "not found in list" in result.stderr
+
+
+def test_show_no_args_gives_error(runner, cli_db):
+    """Calling show with neither counter nor --id produces an error."""
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
+        result = runner.invoke(transaction, ["show"])
+
+    assert result.exit_code == 0
+    assert "provide a counter or --id" in result.stderr
+
+
+def test_show_alias_s(runner, cli_db):
+    """The 's' alias resolves to 'show'."""
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    tid, _ = asyncio.run(
+        _seed_transaction(cli_db, pid, aid, description="Via Alias", txn_date=date(2025, 1, 5))
+    )
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
+        result = runner.invoke(transaction, ["s", "--id", str(tid)])
+
+    assert result.exit_code == 0
+    assert "Via Alias" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -1210,7 +1278,7 @@ def test_txn_alias_shows_transaction(runner, cli_db):
     tid, _ = asyncio.run(_seed_transaction(cli_db, pid, aid, description="AliasShow"))
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(cli, ["txn", "show", str(tid)])
+        result = runner.invoke(cli, ["txn", "show", "--id", str(tid)])
 
     assert result.exit_code == 0
     assert "AliasShow" in result.output

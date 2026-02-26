@@ -54,12 +54,32 @@ def list_transactions(month, project_id, show_id):
 
 
 @transaction.command("show")
-@click.argument("transaction_id")
-def show_transaction(transaction_id):
-    """Show transaction details."""
+@click.argument("counter", required=False, type=int, default=None)
+@click.option("--id", "record_id", default=None, help="Transaction UUID")
+@click.option("--month", default=None, help="YYYY-MM (required when using counter)")
+@click.option("--project", "project_id", default=None, help="Project UUID or name (required when using counter)")
+def show_transaction(counter, record_id, month, project_id):
+    """Show transaction details. Specify by list counter (default) or --id."""
     async def _run():
         async with get_session() as db:
-            t = await transaction_service.get_transaction(db, uuid.UUID(transaction_id))
+            if record_id:
+                tid = uuid.UUID(record_id)
+            elif counter is not None:
+                pid = await resolve_project_id(db, project_id)
+                if not pid:
+                    click.echo("Error: --project required when using counter.", err=True)
+                    return
+                m = require_month(month)
+                items = await transaction_service.list_transactions(db, pid, m)
+                if counter < 1 or counter > len(items):
+                    click.echo(f"Transaction #{counter} not found in list.", err=True)
+                    return
+                tid = items[counter - 1].id
+            else:
+                click.echo("Error: provide a counter or --id.", err=True)
+                return
+
+            t = await transaction_service.get_transaction(db, tid)
             if not t:
                 click.echo("Transaction not found.", err=True)
                 return
