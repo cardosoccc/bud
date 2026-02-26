@@ -12,8 +12,6 @@ class ForecastCreate(BaseModel):
     budget_id: uuid.UUID
     category_id: Optional[uuid.UUID] = None
     tags: List[str] = []
-    min_value: Optional[Decimal] = None
-    max_value: Optional[Decimal] = None
     is_recurrent: bool = False
     recurrent_start: Optional[date] = None
     recurrent_end: Optional[date] = None
@@ -26,8 +24,6 @@ class ForecastRead(BaseModel):
     budget_id: uuid.UUID
     category_id: Optional[uuid.UUID] = None
     tags: List[str] = []
-    min_value: Optional[Decimal] = None
-    max_value: Optional[Decimal] = None
     is_recurrent: bool
     recurrent_start: Optional[date] = None
     recurrent_end: Optional[date] = None
@@ -41,8 +37,6 @@ class ForecastUpdate(BaseModel):
     value: Optional[Decimal] = None
     category_id: Optional[uuid.UUID] = None
     tags: Optional[List[str]] = None
-    min_value: Optional[Decimal] = None
-    max_value: Optional[Decimal] = None
     is_recurrent: Optional[bool] = None
     recurrent_start: Optional[date] = None
     recurrent_end: Optional[date] = None

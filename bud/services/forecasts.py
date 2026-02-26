@@ -31,8 +31,6 @@ async def create_forecast(db: AsyncSession, data: ForecastCreate) -> Forecast:
         budget_id=data.budget_id,
         category_id=data.category_id,
         tags=data.tags,
-        min_value=data.min_value,
-        max_value=data.max_value,
         is_recurrent=data.is_recurrent,
         recurrent_start=data.recurrent_start,
         recurrent_end=data.recurrent_end,

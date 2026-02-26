@@ -107,11 +107,9 @@ def list_forecasts(budget_id, project_id, show_id):
 @click.option("--value", required=True, type=float)
 @click.option("--category", "category_id", default=None, help="Category UUID or name")
 @click.option("--tags", default=None, help="Comma-separated tags")
-@click.option("--min", "min_value", type=float, default=None)
-@click.option("--max", "max_value", type=float, default=None)
 @click.option("--recurrent", is_flag=True, default=False)
 @click.option("--project", "project_id", default=None, help="Project UUID or name")
-def create_forecast(budget_id, description, value, category_id, tags, min_value, max_value, recurrent, project_id):
+def create_forecast(budget_id, description, value, category_id, tags, recurrent, project_id):
     """Create a forecast. Budget defaults to the current month and is auto-created if missing.
 
     At least one of --description, --category, or --tags must be provided.
@@ -143,8 +141,6 @@ def create_forecast(budget_id, description, value, category_id, tags, min_value,
                 budget_id=bid,
                 category_id=cat,
                 tags=tag_list,
-                min_value=min_value,
-                max_value=max_value,
                 is_recurrent=recurrent,
             ))
             label = f.description or f"id: {f.id}"
@@ -160,11 +156,9 @@ def create_forecast(budget_id, description, value, category_id, tags, min_value,
 @click.option("--value", type=float, default=None)
 @click.option("--category", "category_id", default=None, help="Category UUID or name")
 @click.option("--tags", default=None)
-@click.option("--min", "min_value", type=float, default=None)
-@click.option("--max", "max_value", type=float, default=None)
 @click.option("--budget", "budget_id", default=None, help="Budget UUID or month name; defaults to current month")
 @click.option("--project", "project_id", default=None, help="Project UUID or name (required when --budget is a month name)")
-def edit_forecast(counter, record_id, description, value, category_id, tags, min_value, max_value, budget_id, project_id):
+def edit_forecast(counter, record_id, description, value, category_id, tags, budget_id, project_id):
     """Edit a forecast. Specify by list counter (default) or --id."""
     async def _run():
         tag_list = [t.strip() for t in tags.split(",")] if tags else None
@@ -209,8 +203,6 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, min
                 value=value,
                 category_id=cat,
                 tags=tag_list,
-                min_value=min_value,
-                max_value=max_value,
             ))
             if not f:
                 click.echo("Forecast not found.", err=True)
