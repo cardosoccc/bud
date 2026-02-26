@@ -214,21 +214,21 @@ def test_create_multiple_projects(runner, cli_db):
 # project edit
 # ---------------------------------------------------------------------------
 
-def test_edit_by_name_renames_project(runner, cli_db):
-    asyncio.run(_seed(cli_db, "OldName"))
+def test_edit_by_id_renames_project(runner, cli_db):
+    pid, _ = asyncio.run(_seed(cli_db, "OldName"))
 
     with patch("bud.commands.projects.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(project, ["edit", "OldName", "--name", "NewName"])
+        result = runner.invoke(project, ["edit", "--id", str(pid), "--name", "NewName"])
 
     assert result.exit_code == 0
     assert "Updated project: NewName" in result.output
 
 
-def test_edit_by_name_persists_change(runner, cli_db):
-    asyncio.run(_seed(cli_db, "Before"))
+def test_edit_by_id_persists_change(runner, cli_db):
+    pid, _ = asyncio.run(_seed(cli_db, "Before"))
 
     with patch("bud.commands.projects.get_session", new=_make_get_session(cli_db)):
-        runner.invoke(project, ["edit", "Before", "--name", "After"])
+        runner.invoke(project, ["edit", "--id", str(pid), "--name", "After"])
 
     projects = asyncio.run(_fetch_all(cli_db))
     names = {p.name for p in projects}
@@ -236,33 +236,32 @@ def test_edit_by_name_persists_change(runner, cli_db):
     assert "Before" not in names
 
 
-def test_edit_by_uuid_renames_project(runner, cli_db):
-    pid, _ = asyncio.run(_seed(cli_db, "EditByUUID"))
+def test_edit_by_counter_renames_project(runner, cli_db):
+    asyncio.run(_seed(cli_db, "EditByCounter"))
 
     with patch("bud.commands.projects.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(project, ["edit", str(pid), "--name", "Renamed"])
+        result = runner.invoke(project, ["edit", "1", "--name", "Renamed"])
 
     assert result.exit_code == 0
     assert "Updated project: Renamed" in result.output
-
-
-def test_edit_nonexistent_project_outputs_error(runner, cli_db):
-    with patch("bud.commands.projects.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(project, ["edit", "GhostProject", "--name", "X"])
-
-    assert result.exit_code == 0  # click.echo(..., err=True) does not set exit code
-    assert "Project not found" in result.stderr
 
 
 def test_edit_nonexistent_uuid_outputs_error(runner, cli_db):
     fake_id = str(uuid.uuid4())
 
     with patch("bud.commands.projects.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(project, ["edit", fake_id, "--name", "X"])
+        result = runner.invoke(project, ["edit", "--id", fake_id, "--name", "X"])
 
-    # A UUID that doesn't exist resolves immediately (is_uuid returns True) but
-    # update_project returns None → "Project not found." on stderr.
-    assert "Project not found" in result.stderr or result.exit_code != 0
+    assert result.exit_code == 0  # click.echo(..., err=True) does not set exit code
+    assert "Project not found" in result.stderr
+
+
+def test_edit_no_args_outputs_error(runner, cli_db):
+    with patch("bud.commands.projects.get_session", new=_make_get_session(cli_db)):
+        result = runner.invoke(project, ["edit", "--name", "X"])
+
+    assert result.exit_code == 0
+    assert "provide a counter or --id" in result.stderr
 
 
 # ---------------------------------------------------------------------------

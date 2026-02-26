@@ -102,7 +102,7 @@ class TestConfigureAWS:
         monkeypatch.setattr("bud.credentials.CONFIG_DIR", tmp_path)
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["configure-aws"], input="AKID123\nSECRET456\n")
+        result = runner.invoke(cli, ["config", "aws"], input="AKID123\nSECRET456\n")
 
         assert result.exit_code == 0
         assert "AWS credentials saved" in result.output
@@ -119,7 +119,7 @@ class TestConfigureAWS:
         runner = CliRunner()
         result = runner.invoke(
             cli,
-            ["configure-aws", "--access-key-id", "AK", "--secret-access-key", "SK"],
+            ["config", "aws", "--access-key-id", "AK", "--secret-access-key", "SK"],
         )
 
         assert result.exit_code == 0
@@ -139,7 +139,7 @@ class TestConfigureGCP:
 
         runner = CliRunner()
         result = runner.invoke(
-            cli, ["configure-gcp", "--key-file", str(key_file)]
+            cli, ["config", "gcp", "--key-file", str(key_file)]
         )
 
         assert result.exit_code == 0
@@ -154,7 +154,7 @@ class TestConfigureGCP:
 
         runner = CliRunner()
         result = runner.invoke(
-            cli, ["configure-gcp", "--key-file", "/nonexistent/path.json"]
+            cli, ["config", "gcp", "--key-file", "/nonexistent/path.json"]
         )
 
         assert result.exit_code != 0

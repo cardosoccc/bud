@@ -867,7 +867,7 @@ def test_edit_description(runner, cli_db):
     tid, _ = asyncio.run(_seed_transaction(cli_db, pid, aid, description="OldDescription"))
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(transaction, ["edit", str(tid), "--description", "NewDescription"])
+        result = runner.invoke(transaction, ["edit", "--id", str(tid), "--description", "NewDescription"])
 
     assert result.exit_code == 0
     assert "Updated transaction" in result.output
@@ -880,7 +880,7 @@ def test_edit_persists_description(runner, cli_db):
     tid, _ = asyncio.run(_seed_transaction(cli_db, pid, aid, description="Before"))
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        runner.invoke(transaction, ["edit", str(tid), "--description", "After"])
+        runner.invoke(transaction, ["edit", "--id", str(tid), "--description", "After"])
 
     fetched = asyncio.run(_fetch_transaction(cli_db, tid))
     assert fetched.description == "After"
@@ -892,7 +892,7 @@ def test_edit_value(runner, cli_db):
     tid, _ = asyncio.run(_seed_transaction(cli_db, pid, aid, value=Decimal("-50.00")))
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(transaction, ["edit", str(tid), "--value", "-99.99"])
+        result = runner.invoke(transaction, ["edit", "--id", str(tid), "--value", "-99.99"])
 
     assert result.exit_code == 0
 
@@ -906,7 +906,7 @@ def test_edit_date(runner, cli_db):
     tid, _ = asyncio.run(_seed_transaction(cli_db, pid, aid, txn_date=date(2025, 1, 1)))
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(transaction, ["edit", str(tid), "--date", "2025-06-15"])
+        result = runner.invoke(transaction, ["edit", "--id", str(tid), "--date", "2025-06-15"])
 
     assert result.exit_code == 0
 
@@ -920,7 +920,7 @@ def test_edit_tags(runner, cli_db):
     tid, _ = asyncio.run(_seed_transaction(cli_db, pid, aid, tags=["old"]))
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(transaction, ["edit", str(tid), "--tags", "new,updated"])
+        result = runner.invoke(transaction, ["edit", "--id", str(tid), "--tags", "new,updated"])
 
     assert result.exit_code == 0
 
@@ -936,7 +936,7 @@ def test_edit_category_by_uuid(runner, cli_db):
     tid, _ = asyncio.run(_seed_transaction(cli_db, pid, aid))
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(transaction, ["edit", str(tid), "--category", str(cid)])
+        result = runner.invoke(transaction, ["edit", "--id", str(tid), "--category", str(cid)])
 
     assert result.exit_code == 0
 
@@ -951,7 +951,7 @@ def test_edit_category_by_name(runner, cli_db):
     tid, _ = asyncio.run(_seed_transaction(cli_db, pid, aid))
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(transaction, ["edit", str(tid), "--category", "Housing"])
+        result = runner.invoke(transaction, ["edit", "--id", str(tid), "--category", "Housing"])
 
     assert result.exit_code == 0
 
@@ -972,7 +972,7 @@ def test_edit_partial_preserves_other_fields(runner, cli_db):
     )
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        runner.invoke(transaction, ["edit", str(tid), "--description", "Changed"])
+        runner.invoke(transaction, ["edit", "--id", str(tid), "--description", "Changed"])
 
     fetched = asyncio.run(_fetch_transaction(cli_db, tid))
     assert fetched.description == "Changed"
@@ -984,7 +984,7 @@ def test_edit_not_found(runner, cli_db):
     fake_id = str(uuid.uuid4())
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(transaction, ["edit", fake_id, "--description", "Ghost"])
+        result = runner.invoke(transaction, ["edit", "--id", fake_id, "--description", "Ghost"])
 
     assert result.exit_code == 0
     assert "Transaction not found" in result.stderr
@@ -997,7 +997,7 @@ def test_edit_new_category_via_confirm(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
         result = runner.invoke(
-            transaction, ["edit", str(tid), "--category", "BrandNewCat"],
+            transaction, ["edit", "--id", str(tid), "--category", "BrandNewCat"],
             input="y\n",
         )
 
@@ -1012,7 +1012,7 @@ def test_edit_new_category_decline_aborts(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
         runner.invoke(
-            transaction, ["edit", str(tid), "--category", "DeclinedCat"],
+            transaction, ["edit", "--id", str(tid), "--category", "DeclinedCat"],
             input="n\n",
         )
 
@@ -1028,7 +1028,7 @@ def test_edit_category_uuid_not_found_errors(runner, cli_db):
     tid, _ = asyncio.run(_seed_transaction(cli_db, pid, aid))
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(transaction, ["edit", str(tid), "--category", str(uuid.uuid4())])
+        result = runner.invoke(transaction, ["edit", "--id", str(tid), "--category", str(uuid.uuid4())])
 
     assert result.exit_code != 0
 

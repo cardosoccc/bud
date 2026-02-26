@@ -1,3 +1,5 @@
+import uuid
+
 import click
 from tabulate import tabulate
 
