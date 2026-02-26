@@ -63,11 +63,11 @@ bud transaction create --value 3000 --description "Salary" --account Bank
 bud txns
 
 # 8. Create a budget and add a forecast
-bud budget create --month 2025-02
+bud budget create 2025-02
 bud forecast create --budget 2025-02 --description "Groceries" --value -200 --category food
 
 # 9. Generate a report
-bud report show 2025-02
+bud report 2025-02
 ```
 
 ---
@@ -113,13 +113,39 @@ Transactions have:
 
 A budget covers a calendar month (`YYYY-MM`). Each budget belongs to a project and contains a set of **forecasts** — your financial plan for that month.
 
+When a budget is created, any applicable recurrences are automatically populated as forecasts in the new budget.
+
 ### Forecasts
 
-Forecasts are the planned line items in a budget: expected income, expected expenses, recurring bills, etc. They can be:
-- **One-time**: applies only to the budget they belong to
-- **Recurrent**: automatically applies across multiple months, with optional start/end boundaries
+Forecasts are the planned line items in a budget: expected income, expected expenses, recurring bills, etc. Use positive values for expected income and negative values for expected expenses.
 
-Use positive values for expected income and negative values for expected expenses.
+At least one of `--description`, `--category`, or `--tags` must be provided. Forecasts match transactions using all provided criteria (AND logic).
+
+### Recurrences
+
+A recurrence is a dedicated record that tracks a repeating forecast across months. When you create a forecast with `--recurrent` or `--installments`, a recurrence record is created and linked to the forecast. There are two types:
+
+**Open-ended recurrences** (`--recurrent`, optionally with `--recurrence-end`):
+- The forecast repeats every month starting from the budget it was created in.
+- If `--recurrence-end YYYY-MM` is provided, the forecast stops repeating after that month.
+- When created, forecasts are immediately placed in all existing budgets within the range.
+- When a new budget is created in the future, applicable open-ended recurrences are automatically populated.
+
+**Installment-based recurrences** (`--installments N`):
+- The total amount is divided into N monthly installments, each with the same value.
+- All N installments are created immediately, auto-creating budgets as needed.
+- Each forecast stores its installment number; the display shows a suffix like `(1/10)`.
+- Use `--current-installment M` to start from installment M instead of 1 (e.g. when entering a purchase already partially paid). Only installments M through N are created.
+
+**How recurrences are stored:**
+- A `recurrences` table holds metadata: start month, optional end month, optional installment count, the base description, and a reference to the original forecast.
+- Each forecast linked to a recurrence has a `recurrence_id` foreign key and an optional `installment` number.
+- The installment suffix (e.g. `(3/10)`) is assembled dynamically at display time — it is not stored in the forecast's description field.
+
+**Editing recurrent forecasts:**
+- A non-recurrent forecast can be turned into an open-ended recurrence via `--recurrent` (and optionally `--recurrence-end`) on the edit command. Turning into an installment-based recurrence via edit is not supported.
+- Editing the description of a recurrent forecast also updates the recurrence's base description.
+- A forecast that is already recurrent cannot be turned into a recurrence again.
 
 ### Categories
 
@@ -128,6 +154,8 @@ Categories are global labels (not project-specific) that link forecasts to actua
 ### Reports
 
 A report compares forecasts against actual transactions for a given budget month. For months in the future, `bud` calculates a **projected net balance** by summing forecast values from the current month forward through the target month.
+
+Installment-based forecasts display their installment number and total in the report (e.g. `Washer (5/10)`).
 
 ---
 
@@ -144,24 +172,36 @@ Every command that operates on accounts, categories, or budgets accepts either t
 | Full name | Alias |
 |-----------|-------|
 | `transaction` | `txn` |
-| `budget` | `bud` |
+| `budget` | `bdg` |
 | `category` | `cat` |
-| `forecast` | `for` |
+| `forecast` | `fct` |
 | `project` | `prj` |
 | `account` | `acc` |
 | `report` | `rep` |
 | `config` | `cfg` |
+
+**Subcommand aliases** — within each group, CRUD subcommands have single-letter aliases:
+
+| Full name | Alias |
+|-----------|-------|
+| `create` | `c` |
+| `edit` | `e` |
+| `delete` | `d` |
+| `list` | `l` |
+
+Additionally, `project set-default` has alias `s`.
 
 **List shortcuts** — single commands that directly list a resource:
 
 | Command | Equivalent |
 |---------|------------|
 | `bud txns [--month] [--project]` | `bud transaction list` |
-| `bud buds [--project]` | `bud budget list` |
+| `bud bdgs [--project]` | `bud budget list` |
 | `bud cats` | `bud category list` |
-| `bud fors --budget <id> [--project]` | `bud forecast list` |
+| `bud fcts [--budget] [--project]` | `bud forecast list` |
 | `bud prjs` | `bud project list` |
 | `bud accs [--project]` | `bud account list` |
+| `bud cfgs` | `bud config list` |
 
 ---
 
@@ -264,67 +304,87 @@ Delete a transaction. Prompts for confirmation.
 ### `budget` — Manage Budgets
 
 ```
-bud budget list [--project <id>]
+bud budget list [--project <id>] [--show-id]
 ```
-List all budgets for the project, ordered by month.
+List all budgets for the project, ordered by month. Use `--show-id` to display budget UUIDs.
 
 ```
-bud budget create --month <YYYY-MM> [--project <id>]
+bud budget create <YYYY-MM> [--project <id>]
 ```
-Create a monthly budget. The start and end dates are computed automatically from the month string using the correct number of days for that month.
+Create a monthly budget. The start and end dates are computed automatically from the month string. When a budget is created, any applicable recurrences are automatically populated as forecasts.
 
 ```
-bud budget edit <budget-id> [--month <YYYY-MM>] [--project <id>]
+bud budget edit <counter> [--id <uuid>] [--month <YYYY-MM>] [--project <id>]
 ```
-Change the month of a budget. The start/end dates are recalculated. `<budget-id>` can be the UUID or the `YYYY-MM` string.
+Edit a budget's month. Specify the budget by its list counter number or `--id`. The start/end dates are recalculated.
 
 ```
-bud budget delete <budget-id>
+bud budget delete <budget-id> [--project <id>] [--yes]
 ```
-Delete a budget. Prompts for confirmation. Cascades to all forecasts.
+Delete a budget. `<budget-id>` can be a UUID, month name (`YYYY-MM`), or list counter number. Prompts for confirmation unless `--yes` is passed. Cascades to all forecasts.
 
 ---
 
 ### `forecast` — Manage Forecasts
 
 ```
-bud forecast list --budget <id> [--project <id>]
+bud forecast list \
+  [--budget <id>] \
+  [--project <id>] \
+  [--show-id]
 ```
-List all forecasts for a given budget.
+List all forecasts for a budget. `--budget` accepts a UUID or month name (`YYYY-MM`); defaults to the current month. Use `--show-id` to display forecast UUIDs. The output includes a Recurrence column showing installment info (e.g. `3/10`) or `Yes` for open-ended recurrences.
 
 ```
 bud forecast create \
-  --budget <id> \
-  --description <text> \
   --value <float> \
+  [--budget <id>] \
+  [--description <text>] \
   [--category <name-or-id>] \
   [--tags <tag1,tag2>] \
-  [--min <float>] \
-  [--max <float>] \
   [--recurrent] \
+  [--recurrence-end <YYYY-MM>] \
+  [--installments <N>] \
+  [--current-installment <M>] \
   [--project <id>]
 ```
 Create a forecast line item. Options:
-- `--value`: the expected amount (positive = income, negative = expense)
-- `--min` / `--max`: optional range for variable expenses
-- `--recurrent`: marks this forecast as recurring across months
-- `--category`: links this forecast to a category for actual-vs-forecast comparison
+- `--value`: the expected amount (positive = income, negative = expense). Required.
+- `--budget`: budget UUID or month name; defaults to the current month and is auto-created if missing.
+- `--description`: text description of the forecast.
+- `--category`: links this forecast to a category for actual-vs-forecast comparison. If the category doesn't exist, prompts to create it.
+- `--tags`: comma-separated tags.
+- `--recurrent`: marks this forecast as an open-ended recurrence (repeats every month in future budgets).
+- `--recurrence-end`: last month (`YYYY-MM`) for the recurrence. Implies `--recurrent`.
+- `--installments`: number of total installments. Creates all installments immediately, auto-creating budgets as needed.
+- `--current-installment`: which installment number this month represents (e.g. `5` means this is the 5th of N). Requires `--installments`. Only installments from M through N are created. If omitted, defaults to 1.
+
+At least one of `--description`, `--category`, or `--tags` must be provided.
 
 ```
-bud forecast edit <forecast-id> \
+bud forecast edit <counter> \
+  [--id <uuid>] \
   [--description <text>] \
   [--value <float>] \
   [--category <name-or-id>] \
   [--tags <tag1,tag2>] \
-  [--min <float>] \
-  [--max <float>]
+  [--recurrent] \
+  [--recurrence-end <YYYY-MM>] \
+  [--budget <id>] \
+  [--project <id>]
 ```
-Edit a forecast. Only provided fields are updated.
+Edit a forecast. Specify by list counter (default) or `--id`. Only provided fields are updated.
+
+- `--recurrent` / `--recurrence-end`: turns a non-recurrent forecast into an open-ended recurrence. Forecasts are immediately created in existing budgets within the range. Fails if the forecast is already recurrent.
+- Editing the description of a recurrent forecast also updates the recurrence's base description so future budgets use the new description.
 
 ```
-bud forecast delete <forecast-id>
+bud forecast delete <forecast-id> \
+  [--budget <id>] \
+  [--project <id>] \
+  [--yes]
 ```
-Delete a forecast. Prompts for confirmation.
+Delete a forecast. `<forecast-id>` can be a UUID or list counter number. Prompts for confirmation unless `--yes` is passed.
 
 ---
 
@@ -354,18 +414,17 @@ Delete a category. Transactions and forecasts that reference it will have their 
 
 ---
 
-### `report` — Budget Reports
+### `report` — Budget Report
 
 ```
-bud report show [<budget-id>] [--project <id>]
+bud report [<budget-id>] [--project <id>]
 ```
-Generate a report for a budget. `<budget-id>` can be a UUID or a `YYYY-MM` month string. If omitted, defaults to the current active month.
+Generate a report for a budget. `<budget-id>` can be a UUID or a `YYYY-MM` month string. If omitted, defaults to the current month's budget.
 
 The report shows:
-- **Account balances** — net change for each account in the period (sum of transaction values)
-- **Totals** — total earnings (sum of positive transaction values), total expenses (sum of absolute negative values), net balance
-- **Forecast vs. Actuals** — for each forecast line item, shows the planned value, actual spend (from transactions with a matching category), and the difference
-- **Projected net balance** — for future months only: the cumulative sum of forecast values from the current month through the target month, accounting for recurrence bounds
+- **Account balances** — net change for each account in the period, plus calculated and current balances, with an expected balance row that includes the forecast remaining
+- **Forecast vs. Actuals** — for each forecast line item, shows the planned value, actual spend (from transactions with a matching category), and the difference. Installment-based forecasts display their installment suffix (e.g. `Washer (5/10)`).
+- **Projected net balance** — for future months: the cumulative sum of forecast values from the current month through the target month, shown as Previous + Total = Accumulated rows
 
 ---
 
@@ -374,7 +433,12 @@ The report shows:
 ```
 bud db init
 ```
-Create the `~/.bud/` directory and initialize all database tables. Safe to run multiple times (no-op if already initialized).
+Create the `~/.bud/` directory and initialize all database tables. Creates a "default" project automatically. Safe to run multiple times (no-op if already initialized).
+
+```
+bud db migrate
+```
+Run pending database migrations. Creates any new tables, adds new columns to existing tables, and migrates old data to the new schema (e.g. converting old `is_recurrent` flag-based forecasts into proper recurrence records).
 
 ```
 bud db destroy
@@ -398,7 +462,7 @@ Download the database from cloud storage. If the local version is newer, the pul
 
 ---
 
-### Configuration Commands
+### `config` — Configuration
 
 ```
 bud config set <key> <value>
@@ -411,7 +475,7 @@ bud config set bucket gs://my-bucket/bud
 ```
 
 ```
-bud config show
+bud config list
 ```
 Print the current configuration.
 
@@ -480,7 +544,7 @@ bud/
 │   │   ├── categories.py
 │   │   ├── reports.py
 │   │   ├── db.py                 # Session factory + run_async() helper
-│   │   ├── db_commands.py        # db init / destroy / reset
+│   │   ├── db_commands.py        # db init / destroy / reset / migrate
 │   │   ├── sync.py               # db push / pull
 │   │   ├── credentials.py        # config aws / config gcp
 │   │   ├── config_store.py       # Config file read/write (~/.bud/config.json)
@@ -492,6 +556,7 @@ bud/
 │   │   ├── transaction.py
 │   │   ├── budget.py
 │   │   ├── forecast.py
+│   │   ├── recurrence.py
 │   │   └── category.py
 │   │
 │   ├── schemas/                  # Pydantic input/output schemas
@@ -500,6 +565,7 @@ bud/
 │   │   ├── transaction.py
 │   │   ├── budget.py
 │   │   ├── forecast.py
+│   │   ├── recurrence.py
 │   │   ├── category.py
 │   │   └── report.py
 │   │
@@ -510,6 +576,7 @@ bud/
 │       ├── budgets.py
 │       ├── forecasts.py
 │       ├── categories.py
+│       ├── recurrences.py
 │       ├── reports.py
 │       └── storage.py            # AWS S3 / GCP storage providers
 │
@@ -632,20 +699,29 @@ budgets
   project_id (FK → projects CASCADE), created_at
   UNIQUE (name, project_id)
 
+recurrences
+  id (UUID PK), start (YYYY-MM), end (YYYY-MM, nullable),
+  installments (int, nullable), base_description (nullable),
+  original_forecast_id (FK → forecasts CASCADE),
+  project_id (FK → projects CASCADE), created_at
+
 forecasts
-  id (UUID PK), description, value, min_value, max_value, tags (JSON),
-  is_recurrent, recurrent_start, recurrent_end,
+  id (UUID PK), description, value, tags (JSON),
+  installment (int, nullable),
   budget_id (FK → budgets CASCADE),
-  category_id (FK → categories SET NULL), created_at
+  category_id (FK → categories SET NULL),
+  recurrence_id (FK → recurrences SET NULL),
+  created_at
 
 categories
   id (UUID PK), name (unique), created_at
 ```
 
 **Cascade rules:**
-- Deleting a project cascades to its budgets and transactions
+- Deleting a project cascades to its budgets, transactions, and recurrences
 - Deleting a budget cascades to its forecasts
 - Deleting a category sets `category_id` to `NULL` on transactions and forecasts (does not delete them)
+- Deleting a recurrence sets `recurrence_id` to `NULL` on its forecasts (does not delete them)
 - Deleting an account is blocked (`RESTRICT`) if any transaction references it
 
 ---
