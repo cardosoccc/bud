@@ -6,7 +6,7 @@ import os
 import click
 
 
-@click.command("configure-aws")
+@click.command("aws")
 @click.option("--access-key-id", prompt="AWS Access Key ID", help="AWS access key ID.")
 @click.option(
     "--secret-access-key",
@@ -23,7 +23,7 @@ def configure_aws(access_key_id: str, secret_access_key: str) -> None:
     click.echo("AWS credentials saved.")
 
 
-@click.command("configure-gcp")
+@click.command("gcp")
 @click.option(
     "--key-file",
     prompt="Path to GCP service-account key file",

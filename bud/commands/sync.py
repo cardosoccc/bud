@@ -34,8 +34,8 @@ def _get_bucket_url() -> str:
     if not url:
         click.echo(
             "Error: no bucket configured. Set one with:\n"
-            '  bud set-config bucket s3://my-bucket/path\n'
-            '  bud set-config bucket gs://my-bucket/path',
+            '  bud config set bucket s3://my-bucket/path\n'
+            '  bud config set bucket gs://my-bucket/path',
             err=True,
         )
         sys.exit(1)

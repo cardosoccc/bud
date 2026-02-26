@@ -49,7 +49,7 @@ bud project create --name "Personal"
 bud project set-default <project-id>
 
 # 4. Set the active month
-bud set-month 2025-02
+bud config set month 2025-02
 
 # 5. Create accounts
 bud account create --name "Bank" --type debit
@@ -150,7 +150,6 @@ Every command that operates on accounts, categories, or budgets accepts either t
 | `project` | `prj` |
 | `account` | `acc` |
 | `report` | `rep` |
-| `set-month` | `mon` |
 | `config` | `cfg` |
 
 **List shortcuts** — single commands that directly list a resource:
@@ -402,33 +401,27 @@ Download the database from cloud storage. If the local version is newer, the pul
 ### Configuration Commands
 
 ```
-bud set-month <YYYY-MM>
-bud mon <YYYY-MM>
+bud config set <key> <value>
 ```
-Set the active month. This is used as the default for commands that require a month (e.g. `transaction list`, `report show`) so you don't have to type it every time.
-
-```
-bud set-config <key> <value>
-```
-Set an arbitrary configuration value. Used primarily for cloud storage:
+Set a configuration value. Examples:
 ```bash
-bud set-config bucket s3://my-bucket/bud
-bud set-config bucket gs://my-bucket/bud
+bud config set month 2025-02       # set the active month
+bud config set bucket s3://my-bucket/bud
+bud config set bucket gs://my-bucket/bud
 ```
 
 ```
-bud config --show
-bud cfg --show
+bud config show
 ```
 Print the current configuration.
 
 ```
-bud configure-aws
+bud config aws
 ```
 Interactively store AWS credentials (`access_key_id` and `secret_access_key`) in `~/.bud/credentials.json` (mode 0600).
 
 ```
-bud configure-gcp
+bud config gcp
 ```
 Store the path to a GCP service account key file in `~/.bud/credentials.json`.
 
@@ -442,14 +435,14 @@ Store the path to a GCP service account key file in `~/.bud/credentials.json`.
 
 **AWS S3:**
 ```bash
-bud configure-aws          # store credentials
-bud set-config bucket s3://my-bucket/bud
+bud config aws                          # store credentials
+bud config set bucket s3://my-bucket/bud
 ```
 
 **Google Cloud Storage:**
 ```bash
-bud configure-gcp          # store path to service account JSON key
-bud set-config bucket gs://my-bucket/bud
+bud config gcp                          # store path to service account JSON key
+bud config set bucket gs://my-bucket/bud
 ```
 
 ### Sync Workflow
@@ -489,7 +482,7 @@ bud/
 │   │   ├── db.py                 # Session factory + run_async() helper
 │   │   ├── db_commands.py        # db init / destroy / reset
 │   │   ├── sync.py               # db push / pull
-│   │   ├── credentials.py        # configure-aws / configure-gcp
+│   │   ├── credentials.py        # config aws / config gcp
 │   │   ├── config_store.py       # Config file read/write (~/.bud/config.json)
 │   │   └── utils.py              # ID resolution (UUID or name → UUID)
 │   │

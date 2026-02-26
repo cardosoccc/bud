@@ -28,7 +28,13 @@ def get_config_value(key: str, default=None):
     return load_config().get(key, default)
 
 
+_KEY_ALIASES = {
+    "month": "active_month",
+}
+
+
 def set_config_value(key: str, value) -> None:
+    key = _KEY_ALIASES.get(key, key)
     config = load_config()
     config[key] = value
     save_config(config)

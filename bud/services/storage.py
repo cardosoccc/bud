@@ -106,13 +106,13 @@ class S3Provider(StorageProvider):
             raise CloudAuthError(
                 provider="AWS",
                 message="No AWS credentials found.",
-                configure_hint="bud configure-aws",
+                configure_hint="bud config aws",
             )
         except PartialCredentialsError:
             raise CloudAuthError(
                 provider="AWS",
                 message="Incomplete AWS credentials.",
-                configure_hint="bud configure-aws",
+                configure_hint="bud config aws",
             )
         except ClientError as exc:
             code = exc.response.get("Error", {}).get("Code", "")
@@ -120,7 +120,7 @@ class S3Provider(StorageProvider):
                 raise CloudAuthError(
                     provider="AWS",
                     message=f"AWS access denied: {exc}",
-                    configure_hint="bud configure-aws",
+                    configure_hint="bud config aws",
                 )
             raise
 
@@ -185,13 +185,13 @@ class GCSProvider(StorageProvider):
             raise CloudAuthError(
                 provider="GCP",
                 message="No GCP credentials found.",
-                configure_hint="bud configure-gcp",
+                configure_hint="bud config gcp",
             )
         except Forbidden as exc:
             raise CloudAuthError(
                 provider="GCP",
                 message=f"GCP access denied: {exc}",
-                configure_hint="bud configure-gcp",
+                configure_hint="bud config gcp",
             )
 
 

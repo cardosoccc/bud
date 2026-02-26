@@ -4,7 +4,9 @@ from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
 from bud.commands.utils import resolve_project_id, resolve_category_id, resolve_budget_id, is_uuid
+from bud.schemas.budget import BudgetCreate
 from bud.schemas.forecast import ForecastCreate, ForecastUpdate
+from bud.services import budgets as budget_service
 from bud.services import forecasts as forecast_service
 
 
@@ -15,7 +17,7 @@ def forecast():
 
 
 async def _resolve_budget_id(db, budget_id, project_id):
-    """Resolve budget_id string (UUID or month name) to a UUID."""
+    """Resolve budget_id string (UUID or month name) to a UUID. Does NOT auto-create."""
     if is_uuid(budget_id):
         return uuid.UUID(budget_id)
     pid = await resolve_project_id(db, project_id)
@@ -29,17 +31,59 @@ async def _resolve_budget_id(db, budget_id, project_id):
     return bid
 
 
+async def _resolve_or_create_budget_id(db, budget_id, project_id):
+    """Resolve budget to a UUID for forecast creation.
+
+    - No budget given → use active/current month, look up or auto-create.
+    - Month name given → look up or auto-create.
+    - UUID given → use directly (must exist).
+    """
+    from bud.commands.utils import require_month
+
+    if budget_id is not None and is_uuid(budget_id):
+        return uuid.UUID(budget_id)
+
+    # Need a project for lookup / creation
+    pid = await resolve_project_id(db, project_id)
+    if not pid:
+        click.echo("Error: --project required to resolve or create budget.", err=True)
+        return None
+
+    month = budget_id if budget_id else require_month()
+
+    existing = await budget_service.get_budget_by_name(db, pid, month)
+    if existing:
+        return existing.id
+
+    b = await budget_service.create_budget(db, BudgetCreate(name=month, project_id=pid))
+    click.echo(f"Auto-created budget: {b.name}")
+    return b.id
+
+
 @forecast.command("list")
-@click.option("--budget", "budget_id", required=True, help="Budget UUID or month name (YYYY-MM)")
-@click.option("--project", "project_id", default=None, help="Project UUID or name (required when --budget is a month name)")
+@click.option("--budget", "budget_id", default=None, help="Budget UUID or month name (YYYY-MM); defaults to current month")
+@click.option("--project", "project_id", default=None, help="Project UUID or name")
 @click.option("--show-id", is_flag=True, default=False, help="Show forecast UUIDs")
 def list_forecasts(budget_id, project_id, show_id):
-    """List all forecasts for a budget."""
+    """List all forecasts for a budget. Defaults to the current month's budget."""
     async def _run():
+        from bud.commands.utils import require_month
         async with get_session() as db:
-            bid = await _resolve_budget_id(db, budget_id, project_id)
-            if not bid:
-                return
+            if budget_id is None or not is_uuid(budget_id):
+                pid = await resolve_project_id(db, project_id)
+                if not pid:
+                    click.echo("Error: --project required to resolve budget.", err=True)
+                    return
+                month = budget_id if budget_id else require_month()
+                existing = await budget_service.get_budget_by_name(db, pid, month)
+                if not existing:
+                    click.echo("No forecasts found.")
+                    return
+                bid = existing.id
+            else:
+                bid = await _resolve_budget_id(db, budget_id, project_id)
+                if not bid:
+                    return
             items = await forecast_service.list_forecasts(db, bid)
             if not items:
                 click.echo("No forecasts found.")
@@ -56,7 +100,7 @@ def list_forecasts(budget_id, project_id, show_id):
 
 
 @forecast.command("create")
-@click.option("--budget", "budget_id", required=True, help="Budget UUID or month name (YYYY-MM)")
+@click.option("--budget", "budget_id", default=None, help="Budget UUID or month name (YYYY-MM); defaults to current month, auto-created if needed")
 @click.option("--description", required=True)
 @click.option("--value", required=True, type=float)
 @click.option("--category", "category_id", default=None, help="Category UUID or name")
@@ -64,13 +108,13 @@ def list_forecasts(budget_id, project_id, show_id):
 @click.option("--min", "min_value", type=float, default=None)
 @click.option("--max", "max_value", type=float, default=None)
 @click.option("--recurrent", is_flag=True, default=False)
-@click.option("--project", "project_id", default=None, help="Project UUID or name (required when --budget is a month name)")
+@click.option("--project", "project_id", default=None, help="Project UUID or name")
 def create_forecast(budget_id, description, value, category_id, tags, min_value, max_value, recurrent, project_id):
-    """Create a forecast."""
+    """Create a forecast. Budget defaults to the current month and is auto-created if missing."""
     async def _run():
         tag_list = [t.strip() for t in tags.split(",")] if tags else []
         async with get_session() as db:
-            bid = await _resolve_budget_id(db, budget_id, project_id)
+            bid = await _resolve_or_create_budget_id(db, budget_id, project_id)
             if not bid:
                 return
 
@@ -97,35 +141,38 @@ def create_forecast(budget_id, description, value, category_id, tags, min_value,
 
 
 @forecast.command("edit")
-@click.argument("forecast_id")
+@click.argument("counter", required=False, type=int, default=None)
+@click.option("--id", "record_id", default=None, help="Forecast UUID")
 @click.option("--description", default=None)
 @click.option("--value", type=float, default=None)
 @click.option("--category", "category_id", default=None, help="Category UUID or name")
 @click.option("--tags", default=None)
 @click.option("--min", "min_value", type=float, default=None)
 @click.option("--max", "max_value", type=float, default=None)
-@click.option("--budget", "budget_id", default=None, help="Budget UUID or month name (required when FORECAST_ID is a counter)")
+@click.option("--budget", "budget_id", default=None, help="Budget UUID or month name (required when using counter)")
 @click.option("--project", "project_id", default=None, help="Project UUID or name (required when --budget is a month name)")
-def edit_forecast(forecast_id, description, value, category_id, tags, min_value, max_value, budget_id, project_id):
-    """Edit a forecast. FORECAST_ID can be a UUID or list counter (#)."""
+def edit_forecast(counter, record_id, description, value, category_id, tags, min_value, max_value, budget_id, project_id):
+    """Edit a forecast. Specify by list counter (default) or --id."""
     async def _run():
         tag_list = [t.strip() for t in tags.split(",")] if tags else None
         async with get_session() as db:
-            if forecast_id.isdigit():
+            if record_id:
+                fid = uuid.UUID(record_id)
+            elif counter is not None:
                 if not budget_id:
-                    click.echo("Error: --budget required when using forecast counter.", err=True)
+                    click.echo("Error: --budget required when using counter.", err=True)
                     return
                 bid = await _resolve_budget_id(db, budget_id, project_id)
                 if not bid:
                     return
                 items = await forecast_service.list_forecasts(db, bid)
-                n = int(forecast_id)
-                if n < 1 or n > len(items):
-                    click.echo(f"Forecast #{n} not found in list.", err=True)
+                if counter < 1 or counter > len(items):
+                    click.echo(f"Forecast #{counter} not found in list.", err=True)
                     return
-                fid = items[n - 1].id
+                fid = items[counter - 1].id
             else:
-                fid = uuid.UUID(forecast_id)
+                click.echo("Error: provide a counter or --id.", err=True)
+                return
 
             cat = None
             if category_id:

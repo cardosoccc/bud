@@ -5,7 +5,8 @@ from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
 from bud.commands.utils import (
-    resolve_project_id, resolve_account_id, resolve_category_id, is_uuid
+    resolve_project_id, resolve_account_id, resolve_category_id, is_uuid,
+    require_month,
 )
 from bud.schemas.transaction import TransactionCreate, TransactionUpdate
 from bud.services import transactions as transaction_service
@@ -129,16 +130,36 @@ def create_transaction(value, description, txn_date, account_id, project_id, cat
 
 
 @transaction.command("edit")
-@click.argument("transaction_id")
+@click.argument("counter", required=False, type=int, default=None)
+@click.option("--id", "record_id", default=None, help="Transaction UUID")
 @click.option("--value", type=float, default=None)
 @click.option("--description", default=None)
 @click.option("--date", "txn_date", default=None)
 @click.option("--category", "category_id", default=None, help="Category UUID or name")
 @click.option("--tags", default=None, help="Comma-separated tags")
-def edit_transaction(transaction_id, value, description, txn_date, category_id, tags):
-    """Edit a transaction."""
+@click.option("--month", default=None, help="YYYY-MM (required when using counter)")
+@click.option("--project", "project_id", default=None, help="Project UUID or name (required when using counter)")
+def edit_transaction(counter, record_id, value, description, txn_date, category_id, tags, month, project_id):
+    """Edit a transaction. Specify by list counter (default) or --id."""
     async def _run():
         async with get_session() as db:
+            if record_id:
+                tid = uuid.UUID(record_id)
+            elif counter is not None:
+                pid = await resolve_project_id(db, project_id)
+                if not pid:
+                    click.echo("Error: --project required when using counter.", err=True)
+                    return
+                m = require_month(month)
+                items = await transaction_service.list_transactions(db, pid, m)
+                if counter < 1 or counter > len(items):
+                    click.echo(f"Transaction #{counter} not found in list.", err=True)
+                    return
+                tid = items[counter - 1].id
+            else:
+                click.echo("Error: provide a counter or --id.", err=True)
+                return
+
             d = date_type.fromisoformat(txn_date) if txn_date else None
             tag_list = [t.strip() for t in tags.split(",")] if tags else None
 
@@ -158,7 +179,7 @@ def edit_transaction(transaction_id, value, description, txn_date, category_id, 
                     else:
                         return
 
-            t = await transaction_service.update_transaction(db, uuid.UUID(transaction_id), TransactionUpdate(
+            t = await transaction_service.update_transaction(db, tid, TransactionUpdate(
                 value=value,
                 description=description,
                 date=d,

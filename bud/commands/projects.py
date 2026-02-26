@@ -48,24 +48,24 @@ def create_project(name):
 
 
 @project.command("edit")
-@click.argument("project_id")
+@click.argument("counter", required=False, type=int, default=None)
+@click.option("--id", "record_id", default=None, help="Project UUID")
 @click.option("--name", default=None)
-def edit_project(project_id, name):
-    """Edit a project. PROJECT_ID can be a UUID, name, or list counter (#)."""
+def edit_project(counter, record_id, name):
+    """Edit a project. Specify by list counter (default) or --id."""
     async def _run():
         async with get_session() as db:
-            if project_id.isdigit():
+            if record_id:
+                pid = uuid.UUID(record_id)
+            elif counter is not None:
                 items = await project_service.list_projects(db)
-                n = int(project_id)
-                if n < 1 or n > len(items):
-                    click.echo(f"Project #{n} not found in list.", err=True)
+                if counter < 1 or counter > len(items):
+                    click.echo(f"Project #{counter} not found in list.", err=True)
                     return
-                pid = items[n - 1].id
+                pid = items[counter - 1].id
             else:
-                pid = await resolve_project_id(db, project_id)
-                if not pid:
-                    click.echo(f"Project not found: {project_id}", err=True)
-                    return
+                click.echo("Error: provide a counter or --id.", err=True)
+                return
             p = await project_service.update_project(db, pid, ProjectUpdate(name=name))
             if not p:
                 click.echo("Project not found.", err=True)

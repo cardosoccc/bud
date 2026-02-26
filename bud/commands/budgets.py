@@ -41,10 +41,10 @@ def list_budgets(project_id, show_id):
 
 
 @budget.command("create")
-@click.option("--month", required=True, help="YYYY-MM")
+@click.argument("month")
 @click.option("--project", "project_id", default=None, help="Project UUID or name")
 def create_budget(month, project_id):
-    """Create a budget for a month."""
+    """Create a budget for a month (YYYY-MM)."""
     async def _run():
         async with get_session() as db:
             pid = await resolve_project_id(db, project_id)
@@ -58,35 +58,29 @@ def create_budget(month, project_id):
 
 
 @budget.command("edit")
-@click.argument("budget_id")
+@click.argument("counter", required=False, type=int, default=None)
+@click.option("--id", "record_id", default=None, help="Budget UUID")
 @click.option("--month", default=None, help="YYYY-MM")
-@click.option("--project", "project_id", default=None, help="Project UUID or name (required when BUDGET_ID is a month name or counter)")
-def edit_budget(budget_id, month, project_id):
-    """Edit a budget. BUDGET_ID can be a UUID, month name (YYYY-MM), or list counter (#)."""
+@click.option("--project", "project_id", default=None, help="Project UUID or name")
+def edit_budget(counter, record_id, month, project_id):
+    """Edit a budget. Specify by list counter (default) or --id."""
     async def _run():
         async with get_session() as db:
-            if budget_id.isdigit():
+            if record_id:
+                bid = uuid.UUID(record_id)
+            elif counter is not None:
                 pid = await resolve_project_id(db, project_id)
                 if not pid:
-                    click.echo("Error: --project required when using budget counter.", err=True)
+                    click.echo("Error: --project required when using counter.", err=True)
                     return
                 items = await budget_service.list_budgets(db, pid)
-                n = int(budget_id)
-                if n < 1 or n > len(items):
-                    click.echo(f"Budget #{n} not found in list.", err=True)
+                if counter < 1 or counter > len(items):
+                    click.echo(f"Budget #{counter} not found in list.", err=True)
                     return
-                bid = items[n - 1].id
-            elif is_uuid(budget_id):
-                bid = uuid.UUID(budget_id)
+                bid = items[counter - 1].id
             else:
-                pid = await resolve_project_id(db, project_id)
-                if not pid:
-                    click.echo("Error: --project required when using month name for budget.", err=True)
-                    return
-                bid = await resolve_budget_id(db, budget_id, pid)
-                if not bid:
-                    click.echo(f"Budget not found: {budget_id}", err=True)
-                    return
+                click.echo("Error: provide a counter or --id.", err=True)
+                return
             b = await budget_service.update_budget(db, bid, BudgetUpdate(name=month))
             if not b:
                 click.echo("Budget not found.", err=True)

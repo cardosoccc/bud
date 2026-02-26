@@ -8,16 +8,10 @@ from bud.commands.utils import resolve_project_id, resolve_budget_id, is_uuid
 from bud.services import reports as report_service
 
 
-@click.group()
-def report():
-    """Budget reports."""
-    pass
-
-
-@report.command("show")
+@click.command()
 @click.argument("budget_id", required=False, default=None)
 @click.option("--project", "project_id", default=None, help="Project name or ID.")
-def show_report(budget_id, project_id):
+def report(budget_id, project_id):
     """Show a budget report.
 
     BUDGET_ID can be a UUID or a budget name (YYYY-MM). If omitted, defaults
@@ -47,22 +41,23 @@ def show_report(budget_id, project_id):
                 click.echo(f"Error: {e}", err=True)
                 return
 
-            click.echo(f"\nBudget: {r.budget_name}  ({r.start_date} - {r.end_date})")
-            click.echo(f"Total Balance:   {r.total_balance:>12.2f}")
-            click.echo(f"Total Earnings:  {r.total_earnings:>12.2f}")
-            click.echo(f"Total Expenses:  {r.total_expenses:>12.2f}")
+            click.echo(f"\n# {r.budget_name}  ({r.start_date} - {r.end_date})")
+            summary = [
+                ["Total Balance", r.total_balance],
+                ["Total Earnings", r.total_earnings],
+                ["Total Expenses", r.total_expenses],
+            ]
+            click.echo(f"\n{tabulate(summary, tablefmt="psql", floatfmt=".2f")}")
 
             if r.account_balances:
-                click.echo("\nAccount Balances:")
                 rows = [[b.account_name, b.balance] for b in r.account_balances]
-                click.echo(tabulate(rows, headers=["Account", "Balance"], tablefmt="psql", floatfmt=".2f"))
+                click.echo(f"\n{tabulate(rows, headers=["Account", "Balance"], tablefmt="psql", floatfmt=".2f")}")
 
             if r.forecasts:
-                click.echo("\nForecasts vs Actuals:")
                 rows = [
                     [f.description, f.forecast_value, f.actual_value, f.difference]
                     for f in r.forecasts
                 ]
-                click.echo(tabulate(rows, headers=["Description", "Forecast", "Actual", "Difference"], tablefmt="psql", floatfmt=".2f"))
+                click.echo(f"\n{tabulate(rows, headers=["Description", "Forecast", "Actual", "Difference"], tablefmt="psql", floatfmt=".2f")}")
 
     run_async(_run())

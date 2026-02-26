@@ -1,3 +1,5 @@
+import uuid
+
 import click
 from tabulate import tabulate
 
@@ -47,24 +49,24 @@ def create_category(name):
 
 
 @category.command("edit")
-@click.argument("category_id")
+@click.argument("counter", required=False, type=int, default=None)
+@click.option("--id", "record_id", default=None, help="Category UUID")
 @click.option("--name", required=True)
-def edit_category(category_id, name):
-    """Edit a category. CATEGORY_ID can be a UUID, name, or list counter (#)."""
+def edit_category(counter, record_id, name):
+    """Edit a category. Specify by list counter (default) or --id."""
     async def _run():
         async with get_session() as db:
-            if category_id.isdigit():
+            if record_id:
+                cid = uuid.UUID(record_id)
+            elif counter is not None:
                 items = await category_service.list_categories(db)
-                n = int(category_id)
-                if n < 1 or n > len(items):
-                    click.echo(f"Category #{n} not found in list.", err=True)
+                if counter < 1 or counter > len(items):
+                    click.echo(f"Category #{counter} not found in list.", err=True)
                     return
-                cid = items[n - 1].id
+                cid = items[counter - 1].id
             else:
-                cid = await resolve_category_id(db, category_id)
-                if not cid:
-                    click.echo(f"Category not found: {category_id}", err=True)
-                    return
+                click.echo("Error: provide a counter or --id.", err=True)
+                return
             c = await category_service.update_category(db, cid, CategoryUpdate(name=name))
             if not c:
                 click.echo("Category not found.", err=True)
