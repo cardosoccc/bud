@@ -1,8 +1,9 @@
+import uuid
 import click
 from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
-from bud.commands.utils import resolve_project_id, resolve_budget_id
+from bud.commands.utils import resolve_project_id, resolve_budget_id, is_uuid
 from bud.schemas.budget import BudgetCreate, BudgetUpdate
 from bud.services import budgets as budget_service
 
@@ -15,7 +16,8 @@ def budget():
 
 @budget.command("list")
 @click.option("--project", "project_id", default=None, help="Project UUID or name")
-def list_budgets(project_id):
+@click.option("--show-id", is_flag=True, default=False, help="Show budget UUIDs")
+def list_budgets(project_id, show_id):
     """List all budgets for a project."""
     async def _run():
         async with get_session() as db:
@@ -27,8 +29,13 @@ def list_budgets(project_id):
             if not items:
                 click.echo("No budgets found.")
                 return
-            rows = [[str(b.id), b.name, str(b.start_date), str(b.end_date)] for b in items]
-            click.echo(tabulate(rows, headers=["ID", "Month", "Start", "End"], tablefmt="psql"))
+            if show_id:
+                rows = [[i + 1, str(b.id), b.name, str(b.start_date), str(b.end_date)] for i, b in enumerate(items)]
+                headers = ["#", "ID", "Month", "Start", "End"]
+            else:
+                rows = [[i + 1, b.name, str(b.start_date), str(b.end_date)] for i, b in enumerate(items)]
+                headers = ["#", "Month", "Start", "End"]
+            click.echo(tabulate(rows, headers=headers, tablefmt="psql"))
 
     run_async(_run())
 
@@ -53,14 +60,23 @@ def create_budget(month, project_id):
 @budget.command("edit")
 @click.argument("budget_id")
 @click.option("--month", default=None, help="YYYY-MM")
-@click.option("--project", "project_id", default=None, help="Project UUID or name (required when BUDGET_ID is a month name)")
+@click.option("--project", "project_id", default=None, help="Project UUID or name (required when BUDGET_ID is a month name or counter)")
 def edit_budget(budget_id, month, project_id):
-    """Edit a budget. BUDGET_ID can be a UUID or month name (YYYY-MM)."""
+    """Edit a budget. BUDGET_ID can be a UUID, month name (YYYY-MM), or list counter (#)."""
     async def _run():
         async with get_session() as db:
-            from bud.commands.utils import is_uuid
-            if is_uuid(budget_id):
-                import uuid
+            if budget_id.isdigit():
+                pid = await resolve_project_id(db, project_id)
+                if not pid:
+                    click.echo("Error: --project required when using budget counter.", err=True)
+                    return
+                items = await budget_service.list_budgets(db, pid)
+                n = int(budget_id)
+                if n < 1 or n > len(items):
+                    click.echo(f"Budget #{n} not found in list.", err=True)
+                    return
+                bid = items[n - 1].id
+            elif is_uuid(budget_id):
                 bid = uuid.UUID(budget_id)
             else:
                 pid = await resolve_project_id(db, project_id)
@@ -82,16 +98,27 @@ def edit_budget(budget_id, month, project_id):
 
 @budget.command("delete")
 @click.argument("budget_id")
-@click.option("--project", "project_id", default=None, help="Project UUID or name (required when BUDGET_ID is a month name)")
-@click.confirmation_option(prompt="Delete this budget?")
-def delete_budget(budget_id, project_id):
-    """Delete a budget. BUDGET_ID can be a UUID or month name (YYYY-MM)."""
+@click.option("--project", "project_id", default=None, help="Project UUID or name (required when BUDGET_ID is a month name or counter)")
+@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
+def delete_budget(budget_id, project_id, yes):
+    """Delete a budget. BUDGET_ID can be a UUID, month name (YYYY-MM), or list counter (#)."""
     async def _run():
         async with get_session() as db:
-            from bud.commands.utils import is_uuid
-            if is_uuid(budget_id):
-                import uuid
+            if budget_id.isdigit():
+                pid = await resolve_project_id(db, project_id)
+                if not pid:
+                    click.echo("Error: --project required when using budget counter.", err=True)
+                    return
+                items = await budget_service.list_budgets(db, pid)
+                n = int(budget_id)
+                if n < 1 or n > len(items):
+                    click.echo(f"Budget #{n} not found in list.", err=True)
+                    return
+                bid = items[n - 1].id
+                prompt = f"Delete budget #{n} (id: {bid})?"
+            elif is_uuid(budget_id):
                 bid = uuid.UUID(budget_id)
+                prompt = f"Delete budget id: {bid}?"
             else:
                 pid = await resolve_project_id(db, project_id)
                 if not pid:
@@ -101,6 +128,11 @@ def delete_budget(budget_id, project_id):
                 if not bid:
                     click.echo(f"Budget not found: {budget_id}", err=True)
                     return
+                prompt = f"Delete budget id: {bid}?"
+
+            if not yes:
+                click.confirm(prompt, abort=True)
+
             ok = await budget_service.delete_budget(db, bid)
             if not ok:
                 click.echo("Budget not found.", err=True)

@@ -174,14 +174,14 @@ def test_list_shows_table_headers(runner, cli_db):
         result = runner.invoke(account, ["list"])
 
     assert result.exit_code == 0
-    assert "ID" in result.output
+    assert "ID" not in result.output
     assert "Name" in result.output
     assert "Type" in result.output
     assert "Initial Balance" in result.output
     assert "Current Balance" in result.output
 
 
-def test_list_shows_account_uuid(runner, cli_db):
+def test_list_does_not_show_uuid_by_default(runner, cli_db):
     pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
     aid, _ = asyncio.run(_seed_account(cli_db, pid, "WithUUID"))
 
@@ -189,7 +189,37 @@ def test_list_shows_account_uuid(runner, cli_db):
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
         result = runner.invoke(account, ["list"])
 
+    assert str(aid) not in result.output
+
+
+def test_list_shows_uuid_with_show_id_flag(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "WithUUID"))
+
+    with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(account, ["list", "--show-id"])
+
+    assert result.exit_code == 0
+    assert "ID" in result.output
     assert str(aid) in result.output
+
+
+def test_list_sorted_by_name(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    asyncio.run(_seed_account(cli_db, pid, "Zebra"))
+    asyncio.run(_seed_account(cli_db, pid, "Alpha"))
+    asyncio.run(_seed_account(cli_db, pid, "Mango"))
+
+    with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(account, ["list"])
+
+    assert result.exit_code == 0
+    pos_alpha = result.output.index("Alpha")
+    pos_mango = result.output.index("Mango")
+    pos_zebra = result.output.index("Zebra")
+    assert pos_alpha < pos_mango < pos_zebra
 
 
 def test_list_shows_account_type(runner, cli_db):
@@ -257,7 +287,7 @@ def test_create_success_message(runner, cli_db):
 
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(account, ["create", "--name", "NewAccount"])
+        result = runner.invoke(account, ["create", "NewAccount"])
 
     assert result.exit_code == 0
     assert "Created account: NewAccount" in result.output
@@ -268,7 +298,7 @@ def test_create_prints_uuid(runner, cli_db):
 
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(account, ["create", "--name", "HasUUID"])
+        result = runner.invoke(account, ["create", "HasUUID"])
 
     assert result.exit_code == 0
     assert "id:" in result.output
@@ -279,7 +309,7 @@ def test_create_default_type_is_debit(runner, cli_db):
 
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(account, ["create", "--name", "DebitAcc"])
+        result = runner.invoke(account, ["create", "DebitAcc"])
 
     assert result.exit_code == 0
     assert "debit" in result.output
@@ -290,7 +320,7 @@ def test_create_credit_type(runner, cli_db):
 
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(account, ["create", "--name", "CreditCard", "--type", "credit"])
+        result = runner.invoke(account, ["create", "CreditCard", "--type", "credit"])
 
     assert result.exit_code == 0
     assert "credit" in result.output
@@ -301,7 +331,7 @@ def test_create_with_initial_balance(runner, cli_db):
 
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(account, ["create", "--name", "WithBalance", "--initial-balance", "500"])
+        result = runner.invoke(account, ["create", "WithBalance", "--initial-balance", "500"])
 
     assert result.exit_code == 0
     assert "Created account: WithBalance" in result.output
@@ -312,7 +342,7 @@ def test_create_persists_to_db(runner, cli_db):
 
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        runner.invoke(account, ["create", "--name", "Persisted"])
+        runner.invoke(account, ["create", "Persisted"])
 
     accounts = asyncio.run(_fetch_all_accounts(cli_db, pid))
     assert any(a.name == "Persisted" for a in accounts)
@@ -322,7 +352,7 @@ def test_create_by_project_name(runner, cli_db):
     asyncio.run(_seed_project(cli_db, "NamedProj"))
 
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(account, ["create", "--name", "ViaName", "--project", "NamedProj"])
+        result = runner.invoke(account, ["create", "ViaName", "--project", "NamedProj"])
 
     assert result.exit_code == 0
     assert "Created account: ViaName" in result.output
@@ -332,7 +362,7 @@ def test_create_by_project_uuid(runner, cli_db):
     pid, _ = asyncio.run(_seed_project(cli_db, "UUIDProj"))
 
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(account, ["create", "--name", "ViaUUID", "--project", str(pid)])
+        result = runner.invoke(account, ["create", "ViaUUID", "--project", str(pid)])
 
     assert result.exit_code == 0
     assert "Created account: ViaUUID" in result.output
@@ -350,7 +380,7 @@ def test_create_invalid_type_fails(runner, cli_db):
 
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(account, ["create", "--name", "BadType", "--type", "savings"])
+        result = runner.invoke(account, ["create", "BadType", "--type", "savings"])
 
     assert result.exit_code != 0
 
@@ -361,7 +391,7 @@ def test_create_duplicate_name_shows_error(runner, cli_db):
 
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(account, ["create", "--name", "Existing"])
+        result = runner.invoke(account, ["create", "Existing"])
 
     assert result.exit_code == 0
     assert "Error" in result.stderr
@@ -371,7 +401,7 @@ def test_create_duplicate_name_shows_error(runner, cli_db):
 def test_create_no_project_shows_error(runner, cli_db):
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=None):
-        result = runner.invoke(account, ["create", "--name", "NoProject"])
+        result = runner.invoke(account, ["create", "NoProject"])
 
     assert result.exit_code == 0
     assert "Error" in result.stderr
@@ -383,8 +413,8 @@ def test_create_multiple_accounts(runner, cli_db):
 
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        runner.invoke(account, ["create", "--name", "Acc1"])
-        runner.invoke(account, ["create", "--name", "Acc2"])
+        runner.invoke(account, ["create", "Acc1"])
+        runner.invoke(account, ["create", "Acc2"])
 
     accounts = asyncio.run(_fetch_all_accounts(cli_db, pid))
     names = {a.name for a in accounts}
@@ -476,6 +506,46 @@ def test_edit_by_name_no_project_shows_error(runner, cli_db):
     assert result.exit_code == 0
     assert "Error" in result.stderr
     assert "--project required" in result.stderr
+
+
+def test_edit_initial_balance(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "BalanceAcc", initial_balance=100.0))
+
+    with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)):
+        result = runner.invoke(account, ["edit", str(aid), "--initial-balance", "250"])
+
+    assert result.exit_code == 0
+    accounts = asyncio.run(_fetch_all_accounts(cli_db, pid))
+    acc = next(a for a in accounts if a.id == aid)
+    assert float(acc.initial_balance) == 250.0
+
+
+def test_edit_current_balance(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "CurrBalAcc", initial_balance=50.0))
+
+    with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)):
+        result = runner.invoke(account, ["edit", str(aid), "--current-balance", "999"])
+
+    assert result.exit_code == 0
+    accounts = asyncio.run(_fetch_all_accounts(cli_db, pid))
+    acc = next(a for a in accounts if a.id == aid)
+    assert float(acc.current_balance) == 999.0
+
+
+def test_edit_both_balances(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "BothBalAcc"))
+
+    with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)):
+        result = runner.invoke(account, ["edit", str(aid), "--initial-balance", "10", "--current-balance", "20"])
+
+    assert result.exit_code == 0
+    accounts = asyncio.run(_fetch_all_accounts(cli_db, pid))
+    acc = next(a for a in accounts if a.id == aid)
+    assert float(acc.initial_balance) == 10.0
+    assert float(acc.current_balance) == 20.0
 
 
 def test_edit_by_name_not_found_in_project(runner, cli_db):
@@ -618,7 +688,7 @@ def test_acc_alias_creates_account(runner, cli_db):
 
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(cli, ["acc", "create", "--name", "ViaAlias"])
+        result = runner.invoke(cli, ["acc", "create", "ViaAlias"])
 
     assert result.exit_code == 0
     assert "Created account: ViaAlias" in result.output

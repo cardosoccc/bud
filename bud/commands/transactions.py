@@ -20,7 +20,8 @@ def transaction():
 @transaction.command("list")
 @click.option("--month", default=None, help="YYYY-MM")
 @click.option("--project", "project_id", default=None, help="Project UUID or name")
-def list_transactions(month, project_id):
+@click.option("--show-id", is_flag=True, default=False, help="Show transaction UUIDs")
+def list_transactions(month, project_id, show_id):
     """List transactions for a given month."""
     async def _run():
         async with get_session() as db:
@@ -34,11 +35,19 @@ def list_transactions(month, project_id):
             if not items:
                 click.echo("No transactions found.")
                 return
-            rows = [
-                [str(t.id)[:8], t.date, t.description, t.value, t.account.name]
-                for t in items
-            ]
-            click.echo(tabulate(rows, headers=["ID", "Date", "Description", "Value", "Account"], tablefmt="psql", floatfmt=".2f"))
+            if show_id:
+                rows = [
+                    [i + 1, str(t.id), t.date, t.description, t.value, t.account.name]
+                    for i, t in enumerate(items)
+                ]
+                headers = ["#", "ID", "Date", "Description", "Value", "Account"]
+            else:
+                rows = [
+                    [i + 1, t.date, t.description, t.value, t.account.name]
+                    for i, t in enumerate(items)
+                ]
+                headers = ["#", "Date", "Description", "Value", "Account"]
+            click.echo(tabulate(rows, headers=headers, tablefmt="psql", floatfmt=".2f"))
 
     run_async(_run())
 
@@ -166,12 +175,36 @@ def edit_transaction(transaction_id, value, description, txn_date, category_id, 
 
 @transaction.command("delete")
 @click.argument("transaction_id")
-@click.confirmation_option(prompt="Delete this transaction?")
-def delete_transaction(transaction_id):
-    """Delete a transaction."""
+@click.option("--month", default=None, help="YYYY-MM (required when TRANSACTION_ID is a counter)")
+@click.option("--project", "project_id", default=None, help="Project UUID or name (required when TRANSACTION_ID is a counter)")
+@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
+def delete_transaction(transaction_id, month, project_id, yes):
+    """Delete a transaction. TRANSACTION_ID can be a UUID or a list counter (#)."""
     async def _run():
         async with get_session() as db:
-            ok = await transaction_service.delete_transaction(db, uuid.UUID(transaction_id))
+            if transaction_id.isdigit():
+                from bud.commands.utils import require_month
+                pid = await resolve_project_id(db, project_id)
+                if not pid:
+                    click.echo("Error: no project specified. Use --project or set a default with `bud project set-default`.", err=True)
+                    return
+                m = require_month(month)
+                items = await transaction_service.list_transactions(db, pid, m)
+                n = int(transaction_id)
+                if n < 1 or n > len(items):
+                    click.echo(f"Transaction #{n} not found in list.", err=True)
+                    return
+                t = items[n - 1]
+                tid = t.id
+                prompt = f"Delete transaction #{n} (id: {tid})?"
+            else:
+                tid = uuid.UUID(transaction_id)
+                prompt = f"Delete transaction id: {tid}?"
+
+            if not yes:
+                click.confirm(prompt, abort=True)
+
+            ok = await transaction_service.delete_transaction(db, tid)
             if not ok:
                 click.echo("Transaction not found.", err=True)
                 return

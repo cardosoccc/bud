@@ -140,7 +140,7 @@ def test_list_shows_table_headers(runner, cli_db):
         result = runner.invoke(project, ["list"])
 
     assert result.exit_code == 0
-    assert "ID" in result.output
+    assert "#" in result.output
     assert "Name" in result.output
     assert "Default" in result.output
 
@@ -156,11 +156,11 @@ def test_list_marks_default_project(runner, cli_db):
     assert "Yes" in result.output
 
 
-def test_list_shows_project_uuid(runner, cli_db):
+def test_list_shows_project_uuid_with_show_id(runner, cli_db):
     pid, _ = asyncio.run(_seed(cli_db, "WithUUID"))
 
     with patch("bud.commands.projects.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(project, ["list"])
+        result = runner.invoke(project, ["list", "--show-id"])
 
     assert str(pid) in result.output
 

@@ -14,7 +14,8 @@ def category():
 
 
 @category.command("list")
-def list_categories():
+@click.option("--show-id", is_flag=True, default=False, help="Show category UUIDs")
+def list_categories(show_id):
     """List all categories."""
     async def _run():
         async with get_session() as db:
@@ -22,8 +23,13 @@ def list_categories():
             if not items:
                 click.echo("No categories found.")
                 return
-            rows = [[str(c.id), c.name] for c in items]
-            click.echo(tabulate(rows, headers=["ID", "Name"], tablefmt="psql"))
+            if show_id:
+                rows = [[i + 1, str(c.id), c.name] for i, c in enumerate(items)]
+                headers = ["#", "ID", "Name"]
+            else:
+                rows = [[i + 1, c.name] for i, c in enumerate(items)]
+                headers = ["#", "Name"]
+            click.echo(tabulate(rows, headers=headers, tablefmt="psql"))
 
     run_async(_run())
 
@@ -44,13 +50,21 @@ def create_category(name):
 @click.argument("category_id")
 @click.option("--name", required=True)
 def edit_category(category_id, name):
-    """Edit a category. CATEGORY_ID can be a UUID or category name."""
+    """Edit a category. CATEGORY_ID can be a UUID, name, or list counter (#)."""
     async def _run():
         async with get_session() as db:
-            cid = await resolve_category_id(db, category_id)
-            if not cid:
-                click.echo(f"Category not found: {category_id}", err=True)
-                return
+            if category_id.isdigit():
+                items = await category_service.list_categories(db)
+                n = int(category_id)
+                if n < 1 or n > len(items):
+                    click.echo(f"Category #{n} not found in list.", err=True)
+                    return
+                cid = items[n - 1].id
+            else:
+                cid = await resolve_category_id(db, category_id)
+                if not cid:
+                    click.echo(f"Category not found: {category_id}", err=True)
+                    return
             c = await category_service.update_category(db, cid, CategoryUpdate(name=name))
             if not c:
                 click.echo("Category not found.", err=True)
@@ -62,15 +76,29 @@ def edit_category(category_id, name):
 
 @category.command("delete")
 @click.argument("category_id")
-@click.confirmation_option(prompt="Delete this category?")
-def delete_category(category_id):
-    """Delete a category. CATEGORY_ID can be a UUID or category name."""
+@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
+def delete_category(category_id, yes):
+    """Delete a category. CATEGORY_ID can be a UUID, name, or list counter (#)."""
     async def _run():
         async with get_session() as db:
-            cid = await resolve_category_id(db, category_id)
-            if not cid:
-                click.echo(f"Category not found: {category_id}", err=True)
-                return
+            if category_id.isdigit():
+                items = await category_service.list_categories(db)
+                n = int(category_id)
+                if n < 1 or n > len(items):
+                    click.echo(f"Category #{n} not found in list.", err=True)
+                    return
+                cid = items[n - 1].id
+                prompt = f"Delete category #{n} (id: {cid})?"
+            else:
+                cid = await resolve_category_id(db, category_id)
+                if not cid:
+                    click.echo(f"Category not found: {category_id}", err=True)
+                    return
+                prompt = f"Delete category id: {cid}?"
+
+            if not yes:
+                click.confirm(prompt, abort=True)
+
             ok = await category_service.delete_category(db, cid)
             if not ok:
                 click.echo("Category not found.", err=True)

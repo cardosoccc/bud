@@ -26,3 +26,5 @@ class AccountRead(BaseModel):
 class AccountUpdate(BaseModel):
     name: Optional[str] = None
     type: Optional[AccountType] = None
+    initial_balance: Optional[float] = None
+    current_balance: Optional[float] = None

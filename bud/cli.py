@@ -12,6 +12,24 @@ from bud.commands.db_commands import db
 from bud.commands.config_store import set_config_value
 
 
+def _list_alias(list_cmd: click.Command, alias_for: str) -> click.Command:
+    """Return a standalone command that delegates to *list_cmd*.
+
+    The new command inherits all params from *list_cmd* (so it stays in sync
+    automatically) and notes the canonical name in its help text.
+    """
+    @click.pass_context
+    def _callback(ctx, **kwargs):
+        return ctx.invoke(list_cmd, **kwargs)
+
+    return click.Command(
+        name=None,
+        callback=_callback,
+        params=list(list_cmd.params),
+        help=f"(alias: {alias_for})\n\n{list_cmd.help or ''}",
+    )
+
+
 @click.group()
 def cli():
     """bud - Budget management CLI."""
@@ -72,53 +90,14 @@ cli.add_command(cli.commands["set-month"], name="mon")
 cli.add_command(cli.commands["config"], name="cfg")
 
 
-# List shortcuts: <alias>s lists the resource directly
-@cli.command("txns")
-@click.option("--month", default=None, help="YYYY-MM")
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
-@click.pass_context
-def txns(ctx, month, project_id):
-    """List transactions (alias for 'transaction list')."""
-    ctx.invoke(transaction.commands["list"], month=month, project_id=project_id)
-
-
-@cli.command("buds")
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
-@click.pass_context
-def buds(ctx, project_id):
-    """List budgets (alias for 'budget list')."""
-    ctx.invoke(budget.commands["list"], project_id=project_id)
-
-
-@cli.command("cats")
-@click.pass_context
-def cats(ctx):
-    """List categories (alias for 'category list')."""
-    ctx.invoke(category.commands["list"])
-
-
-@cli.command("fors")
-@click.option("--budget", "budget_id", required=True, help="Budget UUID or month name (YYYY-MM)")
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
-@click.pass_context
-def fors(ctx, budget_id, project_id):
-    """List forecasts (alias for 'forecast list')."""
-    ctx.invoke(forecast.commands["list"], budget_id=budget_id, project_id=project_id)
-
-
-@cli.command("prjs")
-@click.pass_context
-def prjs(ctx):
-    """List projects (alias for 'project list')."""
-    ctx.invoke(project.commands["list"])
-
-
-@cli.command("accs")
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
-@click.pass_context
-def accs(ctx, project_id):
-    """List accounts (alias for 'account list')."""
-    ctx.invoke(account.commands["list"], project_id=project_id)
+# List shortcuts: delegate entirely to the underlying 'list' subcommand so that
+# options added to 'list' are automatically available here too.
+cli.add_command(_list_alias(transaction.commands["list"], "txn list"), name="txns")
+cli.add_command(_list_alias(account.commands["list"],     "acc list"), name="accs")
+cli.add_command(_list_alias(budget.commands["list"],      "bud list"), name="buds")
+cli.add_command(_list_alias(category.commands["list"],    "cat list"), name="cats")
+cli.add_command(_list_alias(forecast.commands["list"],    "for list"), name="fors")
+cli.add_command(_list_alias(project.commands["list"],     "prj list"), name="prjs")
 
 
 if __name__ == "__main__":

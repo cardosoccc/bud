@@ -14,30 +14,43 @@ def forecast():
     pass
 
 
+async def _resolve_budget_id(db, budget_id, project_id):
+    """Resolve budget_id string (UUID or month name) to a UUID."""
+    if is_uuid(budget_id):
+        return uuid.UUID(budget_id)
+    pid = await resolve_project_id(db, project_id)
+    if not pid:
+        click.echo("Error: --project required when using month name for budget.", err=True)
+        return None
+    bid = await resolve_budget_id(db, budget_id, pid)
+    if not bid:
+        click.echo(f"Budget not found: {budget_id}", err=True)
+        return None
+    return bid
+
+
 @forecast.command("list")
 @click.option("--budget", "budget_id", required=True, help="Budget UUID or month name (YYYY-MM)")
 @click.option("--project", "project_id", default=None, help="Project UUID or name (required when --budget is a month name)")
-def list_forecasts(budget_id, project_id):
+@click.option("--show-id", is_flag=True, default=False, help="Show forecast UUIDs")
+def list_forecasts(budget_id, project_id, show_id):
     """List all forecasts for a budget."""
     async def _run():
         async with get_session() as db:
-            if is_uuid(budget_id):
-                bid = uuid.UUID(budget_id)
-            else:
-                pid = await resolve_project_id(db, project_id)
-                if not pid:
-                    click.echo("Error: --project required when using month name for budget.", err=True)
-                    return
-                bid = await resolve_budget_id(db, budget_id, pid)
-                if not bid:
-                    click.echo(f"Budget not found: {budget_id}", err=True)
-                    return
+            bid = await _resolve_budget_id(db, budget_id, project_id)
+            if not bid:
+                return
             items = await forecast_service.list_forecasts(db, bid)
             if not items:
                 click.echo("No forecasts found.")
                 return
-            rows = [[str(f.id)[:8], f.description, f.value, "Yes" if f.is_recurrent else ""] for f in items]
-            click.echo(tabulate(rows, headers=["ID", "Description", "Value", "Recurrent"], tablefmt="psql", floatfmt=".2f"))
+            if show_id:
+                rows = [[i + 1, str(f.id), f.description, f.value, "Yes" if f.is_recurrent else ""] for i, f in enumerate(items)]
+                headers = ["#", "ID", "Description", "Value", "Recurrent"]
+            else:
+                rows = [[i + 1, f.description, f.value, "Yes" if f.is_recurrent else ""] for i, f in enumerate(items)]
+                headers = ["#", "Description", "Value", "Recurrent"]
+            click.echo(tabulate(rows, headers=headers, tablefmt="psql", floatfmt=".2f"))
 
     run_async(_run())
 
@@ -57,17 +70,9 @@ def create_forecast(budget_id, description, value, category_id, tags, min_value,
     async def _run():
         tag_list = [t.strip() for t in tags.split(",")] if tags else []
         async with get_session() as db:
-            if is_uuid(budget_id):
-                bid = uuid.UUID(budget_id)
-            else:
-                pid = await resolve_project_id(db, project_id)
-                if not pid:
-                    click.echo("Error: --project required when using month name for budget.", err=True)
-                    return
-                bid = await resolve_budget_id(db, budget_id, pid)
-                if not bid:
-                    click.echo(f"Budget not found: {budget_id}", err=True)
-                    return
+            bid = await _resolve_budget_id(db, budget_id, project_id)
+            if not bid:
+                return
 
             cat = None
             if category_id:
@@ -99,11 +104,29 @@ def create_forecast(budget_id, description, value, category_id, tags, min_value,
 @click.option("--tags", default=None)
 @click.option("--min", "min_value", type=float, default=None)
 @click.option("--max", "max_value", type=float, default=None)
-def edit_forecast(forecast_id, description, value, category_id, tags, min_value, max_value):
-    """Edit a forecast."""
+@click.option("--budget", "budget_id", default=None, help="Budget UUID or month name (required when FORECAST_ID is a counter)")
+@click.option("--project", "project_id", default=None, help="Project UUID or name (required when --budget is a month name)")
+def edit_forecast(forecast_id, description, value, category_id, tags, min_value, max_value, budget_id, project_id):
+    """Edit a forecast. FORECAST_ID can be a UUID or list counter (#)."""
     async def _run():
         tag_list = [t.strip() for t in tags.split(",")] if tags else None
         async with get_session() as db:
+            if forecast_id.isdigit():
+                if not budget_id:
+                    click.echo("Error: --budget required when using forecast counter.", err=True)
+                    return
+                bid = await _resolve_budget_id(db, budget_id, project_id)
+                if not bid:
+                    return
+                items = await forecast_service.list_forecasts(db, bid)
+                n = int(forecast_id)
+                if n < 1 or n > len(items):
+                    click.echo(f"Forecast #{n} not found in list.", err=True)
+                    return
+                fid = items[n - 1].id
+            else:
+                fid = uuid.UUID(forecast_id)
+
             cat = None
             if category_id:
                 cat = await resolve_category_id(db, category_id)
@@ -111,7 +134,7 @@ def edit_forecast(forecast_id, description, value, category_id, tags, min_value,
                     click.echo(f"Category not found: {category_id}", err=True)
                     return
 
-            f = await forecast_service.update_forecast(db, uuid.UUID(forecast_id), ForecastUpdate(
+            f = await forecast_service.update_forecast(db, fid, ForecastUpdate(
                 description=description,
                 value=value,
                 category_id=cat,
@@ -129,12 +152,35 @@ def edit_forecast(forecast_id, description, value, category_id, tags, min_value,
 
 @forecast.command("delete")
 @click.argument("forecast_id")
-@click.confirmation_option(prompt="Delete this forecast?")
-def delete_forecast(forecast_id):
-    """Delete a forecast."""
+@click.option("--budget", "budget_id", default=None, help="Budget UUID or month name (required when FORECAST_ID is a counter)")
+@click.option("--project", "project_id", default=None, help="Project UUID or name (required when --budget is a month name)")
+@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
+def delete_forecast(forecast_id, budget_id, project_id, yes):
+    """Delete a forecast. FORECAST_ID can be a UUID or list counter (#)."""
     async def _run():
         async with get_session() as db:
-            ok = await forecast_service.delete_forecast(db, uuid.UUID(forecast_id))
+            if forecast_id.isdigit():
+                if not budget_id:
+                    click.echo("Error: --budget required when using forecast counter.", err=True)
+                    return
+                bid = await _resolve_budget_id(db, budget_id, project_id)
+                if not bid:
+                    return
+                items = await forecast_service.list_forecasts(db, bid)
+                n = int(forecast_id)
+                if n < 1 or n > len(items):
+                    click.echo(f"Forecast #{n} not found in list.", err=True)
+                    return
+                fid = items[n - 1].id
+                prompt = f"Delete forecast #{n} (id: {fid})?"
+            else:
+                fid = uuid.UUID(forecast_id)
+                prompt = f"Delete forecast id: {fid}?"
+
+            if not yes:
+                click.confirm(prompt, abort=True)
+
+            ok = await forecast_service.delete_forecast(db, fid)
             if not ok:
                 click.echo("Forecast not found.", err=True)
                 return

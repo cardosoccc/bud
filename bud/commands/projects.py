@@ -2,7 +2,7 @@ import click
 from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
-from bud.commands.utils import resolve_project_id
+from bud.commands.utils import resolve_project_id, is_uuid
 from bud.commands.config_store import set_config_value
 from bud.schemas.project import ProjectCreate, ProjectUpdate
 from bud.services import projects as project_service
@@ -15,7 +15,8 @@ def project():
 
 
 @project.command("list")
-def list_projects():
+@click.option("--show-id", is_flag=True, default=False, help="Show project UUIDs")
+def list_projects(show_id):
     """List all projects."""
     async def _run():
         async with get_session() as db:
@@ -23,8 +24,13 @@ def list_projects():
             if not items:
                 click.echo("No projects found.")
                 return
-            rows = [[str(p.id), p.name, "Yes" if p.is_default else ""] for p in items]
-            click.echo(tabulate(rows, headers=["ID", "Name", "Default"], tablefmt="psql"))
+            if show_id:
+                rows = [[i + 1, str(p.id), p.name, "Yes" if p.is_default else ""] for i, p in enumerate(items)]
+                headers = ["#", "ID", "Name", "Default"]
+            else:
+                rows = [[i + 1, p.name, "Yes" if p.is_default else ""] for i, p in enumerate(items)]
+                headers = ["#", "Name", "Default"]
+            click.echo(tabulate(rows, headers=headers, tablefmt="psql"))
 
     run_async(_run())
 
@@ -45,13 +51,21 @@ def create_project(name):
 @click.argument("project_id")
 @click.option("--name", default=None)
 def edit_project(project_id, name):
-    """Edit a project. PROJECT_ID can be a UUID or project name."""
+    """Edit a project. PROJECT_ID can be a UUID, name, or list counter (#)."""
     async def _run():
         async with get_session() as db:
-            pid = await resolve_project_id(db, project_id)
-            if not pid:
-                click.echo(f"Project not found: {project_id}", err=True)
-                return
+            if project_id.isdigit():
+                items = await project_service.list_projects(db)
+                n = int(project_id)
+                if n < 1 or n > len(items):
+                    click.echo(f"Project #{n} not found in list.", err=True)
+                    return
+                pid = items[n - 1].id
+            else:
+                pid = await resolve_project_id(db, project_id)
+                if not pid:
+                    click.echo(f"Project not found: {project_id}", err=True)
+                    return
             p = await project_service.update_project(db, pid, ProjectUpdate(name=name))
             if not p:
                 click.echo("Project not found.", err=True)
@@ -63,15 +77,29 @@ def edit_project(project_id, name):
 
 @project.command("delete")
 @click.argument("project_id")
-@click.confirmation_option(prompt="Delete this project?")
-def delete_project(project_id):
-    """Delete a project. PROJECT_ID can be a UUID or project name."""
+@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
+def delete_project(project_id, yes):
+    """Delete a project. PROJECT_ID can be a UUID, name, or list counter (#)."""
     async def _run():
         async with get_session() as db:
-            pid = await resolve_project_id(db, project_id)
-            if not pid:
-                click.echo(f"Project not found: {project_id}", err=True)
-                return
+            if project_id.isdigit():
+                items = await project_service.list_projects(db)
+                n = int(project_id)
+                if n < 1 or n > len(items):
+                    click.echo(f"Project #{n} not found in list.", err=True)
+                    return
+                pid = items[n - 1].id
+                prompt = f"Delete project #{n} (id: {pid})?"
+            else:
+                pid = await resolve_project_id(db, project_id)
+                if not pid:
+                    click.echo(f"Project not found: {project_id}", err=True)
+                    return
+                prompt = f"Delete project id: {pid}?"
+
+            if not yes:
+                click.confirm(prompt, abort=True)
+
             ok = await project_service.delete_project(db, pid)
             if not ok:
                 click.echo("Project not found.", err=True)
