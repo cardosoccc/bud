@@ -32,6 +32,18 @@ def _list_alias(list_cmd: click.Command, alias_for: str, resource: str) -> click
     )
 
 
+def _add_subcommand_aliases(group: click.Group, aliases: dict[str, str]) -> None:
+    """Register short aliases for subcommands within a group.
+
+    *aliases* maps alias -> canonical subcommand name, e.g. {"e": "edit"}.
+    """
+    for alias, name in aliases.items():
+        if name in group.commands:
+            hidden = copy.copy(group.commands[name])
+            hidden.hidden = True
+            group.add_command(hidden, name=alias)
+
+
 def _add_hidden_alias(group: click.Group, cmd: click.Command, alias: str) -> None:
     """Register *cmd* under *alias* as a hidden command and append the alias
     note to *cmd*'s own help text so it appears in the canonical entry."""
@@ -84,6 +96,13 @@ def config_list():
 config.add_command(configure_aws)
 config.add_command(configure_gcp)
 
+
+# Subcommand aliases (e=edit, c=create, d=delete, l=list, s=set)
+_crud_aliases = {"e": "edit", "c": "create", "d": "delete", "l": "list"}
+for _grp in (account, budget, category, transaction, project, forecast):
+    _add_subcommand_aliases(_grp, _crud_aliases)
+_add_subcommand_aliases(project, {"s": "set-default"})
+_add_subcommand_aliases(config, {"s": "set"})
 
 # Command group aliases — hidden so --help stays clean; the canonical command
 # shows the alias in its own help line.

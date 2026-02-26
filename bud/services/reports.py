@@ -44,6 +44,17 @@ async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
     )
     transactions = list(txns_result.scalars().all())
 
+    # Get all transactions up to the budget end date for cumulative balance
+    cumulative_txns_result = await db.execute(
+        select(Transaction).where(
+            and_(
+                Transaction.project_id == budget.project_id,
+                Transaction.date <= budget.end_date,
+            )
+        )
+    )
+    cumulative_transactions = list(cumulative_txns_result.scalars().all())
+
     # Calculate account balances and totals
     # Positive value = money coming in (income), negative value = money going out (expense)
     account_balances = []
@@ -55,11 +66,20 @@ async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
         net = sum(
             Decimal(str(t.value)) for t in transactions if t.account_id == account.id
         )
+        initial = Decimal(str(account.initial_balance)) if account.initial_balance else Decimal("0")
+        cumulative_net = sum(
+            Decimal(str(t.value)) for t in cumulative_transactions if t.account_id == account.id
+        )
+        calculated_balance = initial + cumulative_net
+        current_bal = Decimal(str(account.current_balance)) if account.current_balance else Decimal("0")
         account_balances.append(
             AccountBalance(
                 account_id=account.id,
                 account_name=account.name,
                 balance=net,
+                calculated_balance=calculated_balance,
+                current_balance=current_bal,
+                difference=calculated_balance - current_bal,
             )
         )
         total_balance += net
@@ -109,12 +129,14 @@ async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
             )
         )
 
-    # For future budgets, calculate projected net balance by summing
-    # net forecast values for all budgets from the earliest future month
-    # up to and including this budget month
+    # For future budgets, calculate projected net balance and accumulated remaining
     projected_net_balance = None
+    accumulated_remaining = None
     if is_projected:
         projected_net_balance = await _calculate_projected_net_balance(
+            db, budget, today
+        )
+        accumulated_remaining = await _calculate_accumulated_remaining(
             db, budget, today
         )
 
@@ -130,7 +152,77 @@ async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
         forecasts=forecast_actuals,
         is_projected=is_projected,
         projected_net_balance=projected_net_balance,
+        accumulated_remaining=accumulated_remaining,
     )
+
+
+async def _calculate_accumulated_remaining(
+    db: AsyncSession, target_budget: Budget, today: date
+) -> Decimal:
+    """Calculate the cumulative forecast remaining (forecast - actual) from the
+    current month through the target budget month."""
+
+    all_budgets_result = await db.execute(
+        select(Budget)
+        .where(Budget.project_id == target_budget.project_id)
+        .order_by(Budget.name)
+    )
+    all_budgets: List[Budget] = list(all_budgets_result.scalars().all())
+
+    cumulative = Decimal("0")
+    for b in all_budgets:
+        if b.start_date > today or (b.start_date <= today <= b.end_date):
+            if b.name > target_budget.name:
+                break
+
+            # Get forecasts for this budget
+            forecasts_result = await db.execute(
+                select(Forecast).where(Forecast.budget_id == b.id)
+            )
+            budget_forecasts = list(forecasts_result.scalars().all())
+
+            # Get transactions for this budget period
+            txns_result = await db.execute(
+                select(Transaction).where(
+                    and_(
+                        Transaction.project_id == target_budget.project_id,
+                        Transaction.date >= b.start_date,
+                        Transaction.date <= b.end_date,
+                    )
+                )
+            )
+            budget_txns = list(txns_result.scalars().all())
+
+            for f in budget_forecasts:
+                if f.is_recurrent:
+                    applies = True
+                    if f.recurrent_start and b.start_date < f.recurrent_start:
+                        applies = False
+                    if f.recurrent_end and b.end_date > f.recurrent_end:
+                        applies = False
+                    if not applies:
+                        continue
+
+                forecast_val = Decimal(str(f.value))
+
+                # Calculate actual for this forecast
+                has_criteria = f.description or f.category_id or f.tags
+                if has_criteria:
+                    actual = Decimal("0")
+                    for t in budget_txns:
+                        if f.category_id and t.category_id != f.category_id:
+                            continue
+                        if f.description and f.description.lower() not in t.description.lower():
+                            continue
+                        if f.tags and not all(tag in (t.tags or []) for tag in f.tags):
+                            continue
+                        actual += Decimal(str(t.value))
+                else:
+                    actual = Decimal("0")
+
+                cumulative += forecast_val - actual
+
+    return cumulative
 
 
 async def _calculate_projected_net_balance(

@@ -37,7 +37,7 @@ def list_categories(show_id):
 
 
 @category.command("create")
-@click.option("--name", required=True)
+@click.argument("name")
 def create_category(name):
     """Create a new category."""
     async def _run():

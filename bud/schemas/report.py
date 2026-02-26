@@ -10,6 +10,9 @@ class AccountBalance(BaseModel):
     account_id: uuid.UUID
     account_name: str
     balance: Decimal
+    calculated_balance: Decimal = Decimal("0")
+    current_balance: Decimal = Decimal("0")
+    difference: Decimal = Decimal("0")
 
 
 class ForecastActual(BaseModel):
@@ -35,3 +38,4 @@ class ReportRead(BaseModel):
     forecasts: List[ForecastActual]
     is_projected: bool = False
     projected_net_balance: Optional[Decimal] = None
+    accumulated_remaining: Optional[Decimal] = None

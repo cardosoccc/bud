@@ -1,11 +1,59 @@
 import uuid
 from datetime import date
+from decimal import Decimal
+
 import click
-from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
 from bud.commands.utils import resolve_project_id, resolve_budget_id, is_uuid
 from bud.services import reports as report_service
+
+# Table 1: 4 cols, 5 separators → inner = 115
+# | Account (43) | Calculated Balance (24) | Current Balance (24) | Difference (24) |
+_T1_WIDTHS = [79, 12, 12, 12]
+_T1_HEADERS = ["Account", "Calculated", "Current", "Difference"]
+_T1_NUM = [False, True, True, True]
+
+# Table 2: 6 cols, 7 separators → inner = 113
+# | Description (40) | Category (12) | Tags (25) | Forecast (12) | Current (12) | Remaining (12) |
+_T2_WIDTHS = [37, 15, 25, 12, 12, 12]
+_T2_HEADERS = ["Description", "Category", "Tags", "Forecast", "Current", "Remaining"]
+_T2_NUM = [False, False, False, True, True, True]
+
+
+def _fmt_cell(val, width, numeric):
+    inner = width - 2
+    if numeric and val != "":
+        s = f"{float(val):.2f}"
+        return f" {s:>{inner}} "
+    s = str(val)
+    if len(s) > inner:
+        s = s[: inner - 3] + "..."
+    return f" {s:<{inner}} "
+
+
+def _fmt_row(values, widths, numeric):
+    return "|" + "|".join(_fmt_cell(v, w, n) for v, w, n in zip(values, widths, numeric)) + "|"
+
+
+def _line(widths):
+    '-' * widths
+
+def _border(widths):
+    return "+" + "+".join("-" * w for w in widths) + "+"
+
+
+def _header_sep(widths):
+    return "|" + "+".join("-" * w for w in widths) + "|"
+
+
+def _build_table(headers, rows, widths, numeric):
+    b = _border(widths)
+    lines = [b, _fmt_row(headers, widths, [False] * len(widths)), _header_sep(widths)]
+    for row in rows:
+        lines.append(_fmt_row(row, widths, numeric))
+    lines.append(b)
+    return "\n".join(lines)
 
 
 @click.command()
@@ -41,39 +89,45 @@ def report(budget_id, project_id):
                 click.echo(f"Error: {e}", err=True)
                 return
 
-            click.echo(f"\n# {r.budget_name}  ({r.start_date} - {r.end_date})")
-            summary = [
-                ["Total Balance", r.total_balance],
-                ["Total Earnings", r.total_earnings],
-                ["Total Expenses", r.total_expenses],
-            ]
-            click.echo(f"\n{tabulate(summary, tablefmt="psql", floatfmt=".2f")}")
+            click.echo(f"\n# {r.budget_name} ({r.start_date} / {r.end_date})")
+
+            total_remaining = sum(f.difference for f in r.forecasts) if r.forecasts else Decimal("0")
 
             if r.account_balances:
-                rows = [[b.account_name, b.balance] for b in r.account_balances]
-                click.echo(f"\n{tabulate(rows, headers=["Account", "Balance"], tablefmt="psql", floatfmt=".2f")}")
+                rows = [[b.account_name, b.calculated_balance, b.current_balance, b.difference] for b in r.account_balances]
+                total_calc = sum(b.calculated_balance for b in r.account_balances)
+                total_curr = sum(b.current_balance for b in r.account_balances)
+                total_diff = sum(b.difference for b in r.account_balances)
 
-            if r.forecasts:
+                table = _build_table(_T1_HEADERS, rows, _T1_WIDTHS, _T1_NUM)
+                b = _border(_T1_WIDTHS)
+                total_row = _fmt_row(["Total", total_calc, total_curr, total_diff], _T1_WIDTHS, _T1_NUM)
+                acc_remaining = r.accumulated_remaining if r.accumulated_remaining is not None else total_remaining
+                exp_calc = total_calc + acc_remaining
+                exp_curr = total_curr + acc_remaining
+                expected_row = _fmt_row(["Expected", exp_calc, exp_curr, total_diff], _T1_WIDTHS, _T1_NUM)
+                click.echo(f"\n{table}\n{total_row}\n{b}\n{expected_row}\n{b}")
+
+            if r.forecasts or (r.is_projected and r.accumulated_remaining is not None):
                 rows = [
                     [f.description or "", f.category_name or "", ", ".join(f.tags) if f.tags else "", f.forecast_value, f.actual_value, f.difference]
                     for f in r.forecasts
                 ]
                 total_forecasted = sum(f.forecast_value for f in r.forecasts)
                 total_current = sum(f.actual_value for f in r.forecasts)
-                total_remaining = sum(f.difference for f in r.forecasts)
-                table = tabulate(rows, headers=["Description", "Category", "Tags", "Forecast", "Current", "Remaining"], tablefmt="psql", floatfmt=".2f")
-                lines = table.split("\n")
-                border = lines[0]  # e.g. +-----+-----+...+
-                # Column widths from border segments between +
-                segments = border.split("+")[1:-1]
-                widths = [len(s) for s in segments]
-                cells = [" " * w for w in widths]
-                cells[0] = " Total".ljust(widths[0])
-                cells[3] = f"{total_forecasted:.2f}".rjust(widths[3] - 1) + " "
-                cells[4] = f"{total_current:.2f}".rjust(widths[4] - 1) + " "
-                cells[5] = f"{total_remaining:.2f}".rjust(widths[5] - 1) + " "
-                footer_row = "|" + "|".join(cells) + "|"
-                # footer_border = border.replace("-", "=")
-                click.echo(f"\n{table}\n{footer_row}\n{border}")
+
+                table = _build_table(_T2_HEADERS, rows, _T2_WIDTHS, _T2_NUM)
+                b = _border(_T2_WIDTHS)
+                total_row = _fmt_row(["Total", "", "", total_forecasted, total_current, total_remaining], _T2_WIDTHS, _T2_NUM)
+                output = f"\n{table}\n{total_row}\n{b}"
+
+                is_future = r.start_date > date.today()
+                if is_future and r.accumulated_remaining is not None:
+                    prev_remaining = r.accumulated_remaining - total_remaining
+                    prev_row = _fmt_row(["Previous", "", "", "", "", prev_remaining], _T2_WIDTHS, _T2_NUM)
+                    acc_row = _fmt_row(["Accumulated", "", "", "", "", r.accumulated_remaining], _T2_WIDTHS, _T2_NUM)
+                    output += f"\n{prev_row}\n{b}\n{acc_row}\n{b}"
+
+                click.echo(output)
 
     run_async(_run())
