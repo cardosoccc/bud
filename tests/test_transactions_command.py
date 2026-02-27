@@ -208,7 +208,7 @@ def test_list_empty(runner, cli_db):
         result = runner.invoke(transaction, ["list", "--month", "2025-01"])
 
     assert result.exit_code == 0
-    assert "No transactions found." in result.output
+    assert "no transactions found." in result.output
 
 
 def test_list_shows_transaction_descriptions(runner, cli_db):
@@ -237,10 +237,10 @@ def test_list_shows_table_headers(runner, cli_db):
 
     assert result.exit_code == 0
     assert "#" in result.output
-    assert "Date" in result.output
-    assert "Description" in result.output
-    assert "Value" in result.output
-    assert "Account" in result.output
+    assert "date" in result.output
+    assert "description" in result.output
+    assert "value" in result.output
+    assert "account" in result.output
 
 
 def test_list_does_not_show_uuid_by_default(runner, cli_db):
@@ -266,7 +266,7 @@ def test_list_shows_uuid_with_show_id_flag(runner, cli_db):
         result = runner.invoke(transaction, ["list", "--month", "2025-01", "--show-id"])
 
     assert result.exit_code == 0
-    assert "ID" in result.output
+    assert "id" in result.output
     assert str(tid) in result.output
 
 
@@ -330,7 +330,7 @@ def test_list_no_project_shows_error(runner, cli_db):
         result = runner.invoke(transaction, ["list", "--month", "2025-01"])
 
     assert result.exit_code == 0
-    assert "Error" in result.stderr
+    assert "error" in result.stderr
     assert "no project specified" in result.stderr
 
 
@@ -392,7 +392,7 @@ def test_list_no_month_defaults_to_current_month(runner, cli_db):
         result = runner.invoke(transaction, ["list"])
 
     assert result.exit_code == 0
-    assert "Error" not in result.output and "Error" not in result.stderr
+    assert "error" not in result.output and "error" not in result.stderr
 
 
 # ---------------------------------------------------------------------------
@@ -489,7 +489,7 @@ def test_show_no_tags_displays_dash(runner, cli_db):
         result = runner.invoke(transaction, ["show", str(tid)])
 
     assert result.exit_code == 0
-    assert "Tags:" in result.output
+    assert "tags:" in result.output
 
 
 def test_show_not_found(runner, cli_db):
@@ -499,7 +499,7 @@ def test_show_not_found(runner, cli_db):
         result = runner.invoke(transaction, ["show", fake_id])
 
     assert result.exit_code == 0
-    assert "Transaction not found" in result.stderr
+    assert "transaction not found" in result.stderr
 
 
 def test_show_displays_field_labels(runner, cli_db):
@@ -511,13 +511,13 @@ def test_show_displays_field_labels(runner, cli_db):
         result = runner.invoke(transaction, ["show", str(tid)])
 
     assert result.exit_code == 0
-    assert "ID:" in result.output
-    assert "Date:" in result.output
-    assert "Description:" in result.output
-    assert "Value:" in result.output
-    assert "Account:" in result.output
-    assert "Category:" in result.output
-    assert "Tags:" in result.output
+    assert "id:" in result.output
+    assert "date:" in result.output
+    assert "description:" in result.output
+    assert "value:" in result.output
+    assert "account:" in result.output
+    assert "category:" in result.output
+    assert "tags:" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -539,7 +539,7 @@ def test_create_success_message(runner, cli_db):
         ])
 
     assert result.exit_code == 0
-    assert "Created transaction" in result.output
+    assert "created transaction" in result.output
     assert "Coffee" in result.output
 
 
@@ -594,7 +594,7 @@ def test_create_with_account_by_name(runner, cli_db):
         ])
 
     assert result.exit_code == 0
-    assert "Created transaction" in result.output
+    assert "created transaction" in result.output
 
 
 def test_create_with_project_by_name(runner, cli_db):
@@ -612,7 +612,7 @@ def test_create_with_project_by_name(runner, cli_db):
         ])
 
     assert result.exit_code == 0
-    assert "Created transaction" in result.output
+    assert "created transaction" in result.output
 
 
 def test_create_with_project_by_uuid(runner, cli_db):
@@ -630,7 +630,7 @@ def test_create_with_project_by_uuid(runner, cli_db):
         ])
 
     assert result.exit_code == 0
-    assert "Created transaction" in result.output
+    assert "created transaction" in result.output
 
 
 def test_create_with_category(runner, cli_db):
@@ -650,7 +650,7 @@ def test_create_with_category(runner, cli_db):
         ])
 
     assert result.exit_code == 0
-    assert "Created transaction" in result.output
+    assert "created transaction" in result.output
 
     txns = asyncio.run(_fetch_all_transactions(cli_db, pid))
     cat_txn = next((t for t in txns if t.description == "WithCategory"), None)
@@ -675,7 +675,7 @@ def test_create_with_category_by_name(runner, cli_db):
         ])
 
     assert result.exit_code == 0
-    assert "Created transaction" in result.output
+    assert "created transaction" in result.output
 
 
 def test_create_with_tags(runner, cli_db):
@@ -716,7 +716,7 @@ def test_create_positive_value_income(runner, cli_db):
         ])
 
     assert result.exit_code == 0
-    assert "Created transaction" in result.output
+    assert "created transaction" in result.output
 
     txns = asyncio.run(_fetch_all_transactions(cli_db, pid))
     salary = next((t for t in txns if t.description == "Salary"), None)
@@ -736,7 +736,7 @@ def test_create_no_project_shows_error(runner, cli_db):
         ])
 
     assert result.exit_code == 0
-    assert "Error" in result.stderr
+    assert "error" in result.stderr
     assert "no project specified" in result.stderr
 
 
@@ -754,7 +754,7 @@ def test_create_account_not_found_shows_error(runner, cli_db):
         ])
 
     assert result.exit_code == 0
-    assert "Account not found" in result.stderr
+    assert "account not found" in result.stderr
 
 
 def test_create_missing_value_fails(runner, cli_db):
@@ -810,7 +810,7 @@ def test_create_new_category_via_confirm(runner, cli_db):
         )
 
     assert result.exit_code == 0
-    assert "Created category" in result.output or "Created transaction" in result.output
+    assert "created category" in result.output or "created transaction" in result.output
 
 
 def test_create_new_category_decline_aborts(runner, cli_db):
@@ -870,7 +870,7 @@ def test_edit_description(runner, cli_db):
         result = runner.invoke(transaction, ["edit", "--id", str(tid), "--description", "NewDescription"])
 
     assert result.exit_code == 0
-    assert "Updated transaction" in result.output
+    assert "updated transaction" in result.output
     assert "NewDescription" in result.output
 
 
@@ -987,7 +987,7 @@ def test_edit_not_found(runner, cli_db):
         result = runner.invoke(transaction, ["edit", "--id", fake_id, "--description", "Ghost"])
 
     assert result.exit_code == 0
-    assert "Transaction not found" in result.stderr
+    assert "transaction not found" in result.stderr
 
 
 def test_edit_new_category_via_confirm(runner, cli_db):
@@ -1002,7 +1002,7 @@ def test_edit_new_category_via_confirm(runner, cli_db):
         )
 
     assert result.exit_code == 0
-    assert "Created category" in result.output or "Updated transaction" in result.output
+    assert "created category" in result.output or "updated transaction" in result.output
 
 
 def test_edit_new_category_decline_aborts(runner, cli_db):
@@ -1046,7 +1046,7 @@ def test_delete_with_yes_flag(runner, cli_db):
         result = runner.invoke(transaction, ["delete", str(tid), "--yes"])
 
     assert result.exit_code == 0
-    assert "Transaction deleted." in result.output
+    assert "transaction deleted." in result.output
 
 
 def test_delete_removes_from_db(runner, cli_db):
@@ -1070,7 +1070,7 @@ def test_delete_confirmation_prompt_accept(runner, cli_db):
         result = runner.invoke(transaction, ["delete", str(tid)], input="y\n")
 
     assert result.exit_code == 0
-    assert "Transaction deleted." in result.output
+    assert "transaction deleted." in result.output
 
 
 def test_delete_confirmation_prompt_abort(runner, cli_db):
@@ -1092,7 +1092,7 @@ def test_delete_not_found(runner, cli_db):
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
         result = runner.invoke(transaction, ["delete", fake_id, "--yes"])
 
-    assert "Transaction not found" in result.stderr
+    assert "transaction not found" in result.stderr
 
 
 def test_delete_leaves_other_transactions_intact(runner, cli_db):
@@ -1122,7 +1122,7 @@ def test_delete_by_counter_deletes_correct_transaction(runner, cli_db):
         result = runner.invoke(transaction, ["delete", "1", "--month", "2025-01", "--yes"])
 
     assert result.exit_code == 0
-    assert "Transaction deleted." in result.output
+    assert "transaction deleted." in result.output
     txns = asyncio.run(_fetch_all_transactions(cli_db, pid))
     ids = [t.id for t in txns]
     assert tid1 not in ids  # #1 = most recent (2025-01-20)
@@ -1187,7 +1187,7 @@ def test_txn_alias_creates_transaction(runner, cli_db):
         ])
 
     assert result.exit_code == 0
-    assert "Created transaction" in result.output
+    assert "created transaction" in result.output
     assert "ViaAlias" in result.output
 
 
@@ -1241,7 +1241,7 @@ def test_txns_shortcut_empty(runner, cli_db):
         result = runner.invoke(cli, ["txns", "--month", "2025-01"])
 
     assert result.exit_code == 0
-    assert "No transactions found." in result.output
+    assert "no transactions found." in result.output
 
 
 def test_txns_shortcut_with_project_option(runner, cli_db):

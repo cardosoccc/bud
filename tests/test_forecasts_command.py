@@ -205,7 +205,7 @@ class TestCreateDescriptionOptional:
             "--budget", "2025-01", "--project", "proj",
         ])
         assert result.exit_code == 0
-        assert "Created forecast" in result.output
+        assert "created forecast" in result.output
 
     def test_create_with_category_only(self, runner, cli_db):
         pid, _ = asyncio.run(_seed_project(cli_db, "proj", is_default=True))
@@ -216,7 +216,7 @@ class TestCreateDescriptionOptional:
             "--budget", "2025-01", "--project", "proj",
         ])
         assert result.exit_code == 0
-        assert "Created forecast" in result.output
+        assert "created forecast" in result.output
 
     def test_create_with_tags_only(self, runner, cli_db):
         pid, _ = asyncio.run(_seed_project(cli_db, "proj", is_default=True))
@@ -226,7 +226,7 @@ class TestCreateDescriptionOptional:
             "--budget", "2025-01", "--project", "proj",
         ])
         assert result.exit_code == 0
-        assert "Created forecast" in result.output
+        assert "created forecast" in result.output
 
     def test_create_no_criteria_fails(self, runner, cli_db):
         pid, _ = asyncio.run(_seed_project(cli_db, "proj", is_default=True))
@@ -248,7 +248,7 @@ class TestCreateDescriptionOptional:
             "--budget", "2025-01", "--project", "proj",
         ])
         assert result.exit_code == 0
-        assert "Created forecast" in result.output
+        assert "created forecast" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -271,8 +271,8 @@ class TestCreateAutoCategory:
                 "--budget", "2025-01", "--project", "proj",
             ], input="y\n")
         assert result.exit_code == 0
-        assert "Created category: NewCat" in result.output
-        assert "Created forecast" in result.output
+        assert "created category: NewCat" in result.output
+        assert "created forecast" in result.output
 
     def test_create_aborts_when_category_declined(self, runner, cli_db):
         pid, _ = asyncio.run(_seed_project(cli_db, "proj", is_default=True))
@@ -282,7 +282,7 @@ class TestCreateAutoCategory:
                 "create", "--value", "-100", "--category", "NewCat",
                 "--budget", "2025-01", "--project", "proj",
             ], input="n\n")
-        assert "Created forecast" not in result.output
+        assert "created forecast" not in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -297,7 +297,7 @@ class TestListShowsCategoryAndTags:
         asyncio.run(_seed_forecast(cli_db, bid, value=-200, description="Groceries", category_id=cat_id))
         result = _invoke(runner, cli_db, ["list", "--budget", "2025-01", "--project", "proj"])
         assert result.exit_code == 0
-        assert "Category" in result.output
+        assert "category" in result.output
         assert "Food" in result.output
 
     def test_list_shows_tags_column(self, runner, cli_db):
@@ -306,7 +306,7 @@ class TestListShowsCategoryAndTags:
         asyncio.run(_seed_forecast(cli_db, bid, value=-50, description="Snacks", tags=["weekly", "food"]))
         result = _invoke(runner, cli_db, ["list", "--budget", "2025-01", "--project", "proj"])
         assert result.exit_code == 0
-        assert "Tags" in result.output
+        assert "tags" in result.output
         assert "weekly" in result.output
         assert "food" in result.output
 
@@ -336,7 +336,7 @@ class TestDeleteDefaultsToCurrentMonth:
                 "delete", "1", "--project", "proj", "--yes",
             ])
         assert result.exit_code == 0
-        assert "Forecast deleted" in result.output
+        assert "forecast deleted" in result.output
 
 
 # ---------------------------------------------------------------------------
