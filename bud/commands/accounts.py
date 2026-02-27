@@ -81,23 +81,26 @@ def edit_account(identifier, record_id, name, account_type, initial_balance, cur
             if record_id:
                 aid = uuid.UUID(record_id)
             elif identifier is not None:
-                pid = await resolve_project_id(db, project_id)
-                if not pid:
-                    click.echo("error: --project required when using counter or name.", err=True)
-                    return
-                if identifier.isdigit():
-                    items = await account_service.list_accounts(db, pid)
-                    items = sorted(items, key=lambda a: a.name.lower())
-                    n = int(identifier)
-                    if n < 1 or n > len(items):
-                        click.echo(f"account #{n} not found in list.", err=True)
-                        return
-                    aid = items[n - 1].id
+                if is_uuid(identifier):
+                    aid = uuid.UUID(identifier)
                 else:
-                    aid = await resolve_account_id(db, identifier, pid)
-                    if not aid:
-                        click.echo(f"account not found: {identifier}", err=True)
+                    pid = await resolve_project_id(db, project_id)
+                    if not pid:
+                        click.echo("error: --project required when using counter or name.", err=True)
                         return
+                    if identifier.isdigit():
+                        items = await account_service.list_accounts(db, pid)
+                        items = sorted(items, key=lambda a: a.name.lower())
+                        n = int(identifier)
+                        if n < 1 or n > len(items):
+                            click.echo(f"account #{n} not found in list.", err=True)
+                            return
+                        aid = items[n - 1].id
+                    else:
+                        aid = await resolve_account_id(db, identifier, pid)
+                        if not aid:
+                            click.echo(f"account not found: {identifier}", err=True)
+                            return
             else:
                 click.echo("error: provide a counter, name, or --id.", err=True)
                 return
