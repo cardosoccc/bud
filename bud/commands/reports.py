@@ -11,13 +11,13 @@ from bud.services import reports as report_service
 # Table 1: 4 cols, 5 separators → inner = 115
 # | Account (43) | Calculated Balance (24) | Current Balance (24) | Difference (24) |
 _T1_WIDTHS = [79, 12, 12, 12]
-_T1_HEADERS = ["Account", "Calculated", "Current", "Difference"]
+_T1_HEADERS = ["account", "calculated", "current", "difference"]
 _T1_NUM = [False, True, True, True]
 
 # Table 2: 6 cols, 7 separators → inner = 113
 # | Description (40) | Category (12) | Tags (25) | Forecast (12) | Current (12) | Remaining (12) |
 _T2_WIDTHS = [37, 15, 25, 12, 12, 12]
-_T2_HEADERS = ["Description", "Category", "Tags", "Forecast", "Current", "Remaining"]
+_T2_HEADERS = ["description", "category", "tags", "forecast", "current", "remaining"]
 _T2_NUM = [False, False, False, True, True, True]
 
 
@@ -33,26 +33,17 @@ def _fmt_cell(val, width, numeric):
 
 
 def _fmt_row(values, widths, numeric):
-    return "|" + "|".join(_fmt_cell(v, w, n) for v, w, n in zip(values, widths, numeric)) + "|"
+    return "|".join(_fmt_cell(v, w, n) for v, w, n in zip(values, widths, numeric))
 
 
-def _line(widths):
-    '-' * widths
-
-def _border(widths):
-    return "+" + "+".join("-" * w for w in widths) + "+"
-
-
-def _header_sep(widths):
-    return "|" + "+".join("-" * w for w in widths) + "|"
+def _separator(widths):
+    return "+".join("-" * w for w in widths)
 
 
 def _build_table(headers, rows, widths, numeric):
-    b = _border(widths)
-    lines = [b, _fmt_row(headers, widths, [False] * len(widths)), _header_sep(widths)]
+    lines = [_fmt_row(headers, widths, [False] * len(widths)), _separator(widths)]
     for row in rows:
         lines.append(_fmt_row(row, widths, numeric))
-    lines.append(b)
     return "\n".join(lines)
 
 
@@ -74,7 +65,7 @@ def report(budget_id, project_id):
                     pid = await resolve_project_id(db, project_id)
                     if not pid:
                         click.echo(
-                            "Error: no project specified. Use --project or set a default with"
+                            "error: no project specified. use --project or set a default with"
                             " `bud project set-default`.",
                             err=True,
                         )
@@ -82,11 +73,11 @@ def report(budget_id, project_id):
                     identifier = budget_id if budget_id is not None else date.today().strftime("%Y-%m")
                     bid = await resolve_budget_id(db, identifier, pid)
                     if not bid:
-                        click.echo(f"Error: budget '{identifier}' not found.", err=True)
+                        click.echo(f"error: budget '{identifier}' not found.", err=True)
                         return
                 r = await report_service.generate_report(db, bid)
             except ValueError as e:
-                click.echo(f"Error: {e}", err=True)
+                click.echo(f"error: {e}", err=True)
                 return
 
             click.echo(f"\n# {r.budget_name} ({r.start_date} / {r.end_date})")
@@ -100,13 +91,13 @@ def report(budget_id, project_id):
                 total_diff = sum(b.difference for b in r.account_balances)
 
                 table = _build_table(_T1_HEADERS, rows, _T1_WIDTHS, _T1_NUM)
-                b = _border(_T1_WIDTHS)
-                total_row = _fmt_row(["Total", total_calc, total_curr, total_diff], _T1_WIDTHS, _T1_NUM)
+                sep = _separator(_T1_WIDTHS)
+                total_row = _fmt_row(["total", total_calc, total_curr, total_diff], _T1_WIDTHS, _T1_NUM)
                 acc_remaining = r.accumulated_remaining if r.accumulated_remaining is not None else total_remaining
                 exp_calc = total_calc + acc_remaining
                 exp_curr = total_curr + acc_remaining
-                expected_row = _fmt_row(["Expected", exp_calc, exp_curr, total_diff], _T1_WIDTHS, _T1_NUM)
-                click.echo(f"\n{table}\n{total_row}\n{b}\n{expected_row}\n{b}")
+                expected_row = _fmt_row(["expected", exp_calc, exp_curr, total_diff], _T1_WIDTHS, _T1_NUM)
+                click.echo(f"\n{table}\n{sep}\n{total_row}\n{sep}\n{expected_row}")
 
             if r.forecasts or (r.is_projected and r.accumulated_remaining is not None):
                 def _display_desc(f):
@@ -123,16 +114,16 @@ def report(budget_id, project_id):
                 total_current = sum(f.actual_value for f in r.forecasts)
 
                 table = _build_table(_T2_HEADERS, rows, _T2_WIDTHS, _T2_NUM)
-                b = _border(_T2_WIDTHS)
-                total_row = _fmt_row(["Total", "", "", total_forecasted, total_current, total_remaining], _T2_WIDTHS, _T2_NUM)
-                output = f"\n{table}\n{total_row}\n{b}"
+                sep = _separator(_T2_WIDTHS)
+                total_row = _fmt_row(["total", "", "", total_forecasted, total_current, total_remaining], _T2_WIDTHS, _T2_NUM)
+                output = f"\n{table}\n{sep}\n{total_row}"
 
                 is_future = r.start_date > date.today()
                 if is_future and r.accumulated_remaining is not None:
                     prev_remaining = r.accumulated_remaining - total_remaining
-                    prev_row = _fmt_row(["Previous", "", "", "", "", prev_remaining], _T2_WIDTHS, _T2_NUM)
-                    acc_row = _fmt_row(["Accumulated", "", "", "", "", r.accumulated_remaining], _T2_WIDTHS, _T2_NUM)
-                    output += f"\n{prev_row}\n{b}\n{acc_row}\n{b}"
+                    prev_row = _fmt_row(["previous", "", "", "", "", prev_remaining], _T2_WIDTHS, _T2_NUM)
+                    acc_row = _fmt_row(["accumulated", "", "", "", "", r.accumulated_remaining], _T2_WIDTHS, _T2_NUM)
+                    output += f"\n{sep}\n{prev_row}\n{sep}\n{acc_row}"
 
                 click.echo(output)
 

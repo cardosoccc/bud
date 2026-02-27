@@ -118,7 +118,7 @@ def test_list_empty(runner, cli_db):
         result = runner.invoke(project, ["list"])
 
     assert result.exit_code == 0
-    assert "No projects found." in result.output
+    assert "no projects found." in result.output
 
 
 def test_list_shows_project_names(runner, cli_db):
@@ -141,8 +141,8 @@ def test_list_shows_table_headers(runner, cli_db):
 
     assert result.exit_code == 0
     assert "#" in result.output
-    assert "Name" in result.output
-    assert "Default" in result.output
+    assert "name" in result.output
+    assert "default" in result.output
 
 
 def test_list_marks_default_project(runner, cli_db):
@@ -153,7 +153,7 @@ def test_list_marks_default_project(runner, cli_db):
         result = runner.invoke(project, ["list"])
 
     assert result.exit_code == 0
-    assert "Yes" in result.output
+    assert "yes" in result.output
 
 
 def test_list_shows_project_uuid_with_show_id(runner, cli_db):
@@ -174,7 +174,7 @@ def test_create_success_message(runner, cli_db):
         result = runner.invoke(project, ["create", "--name", "NewProj"])
 
     assert result.exit_code == 0
-    assert "Created project: NewProj" in result.output
+    assert "created project: NewProj" in result.output
 
 
 def test_create_prints_uuid(runner, cli_db):
@@ -221,7 +221,7 @@ def test_edit_by_id_renames_project(runner, cli_db):
         result = runner.invoke(project, ["edit", "--id", str(pid), "--name", "NewName"])
 
     assert result.exit_code == 0
-    assert "Updated project: NewName" in result.output
+    assert "updated project: NewName" in result.output
 
 
 def test_edit_by_id_persists_change(runner, cli_db):
@@ -243,7 +243,7 @@ def test_edit_by_counter_renames_project(runner, cli_db):
         result = runner.invoke(project, ["edit", "1", "--name", "Renamed"])
 
     assert result.exit_code == 0
-    assert "Updated project: Renamed" in result.output
+    assert "updated project: Renamed" in result.output
 
 
 def test_edit_nonexistent_uuid_outputs_error(runner, cli_db):
@@ -253,7 +253,7 @@ def test_edit_nonexistent_uuid_outputs_error(runner, cli_db):
         result = runner.invoke(project, ["edit", "--id", fake_id, "--name", "X"])
 
     assert result.exit_code == 0  # click.echo(..., err=True) does not set exit code
-    assert "Project not found" in result.stderr
+    assert "project not found" in result.stderr
 
 
 def test_edit_no_args_outputs_error(runner, cli_db):
@@ -275,7 +275,7 @@ def test_delete_by_name_with_yes_flag(runner, cli_db):
         result = runner.invoke(project, ["delete", "DeleteMe", "--yes"])
 
     assert result.exit_code == 0
-    assert "Project deleted." in result.output
+    assert "project deleted." in result.output
 
 
 def test_delete_by_name_removes_from_db(runner, cli_db):
@@ -295,14 +295,14 @@ def test_delete_by_uuid_with_yes_flag(runner, cli_db):
         result = runner.invoke(project, ["delete", str(pid), "--yes"])
 
     assert result.exit_code == 0
-    assert "Project deleted." in result.output
+    assert "project deleted." in result.output
 
 
 def test_delete_nonexistent_outputs_error(runner, cli_db):
     with patch("bud.commands.projects.get_session", new=_make_get_session(cli_db)):
         result = runner.invoke(project, ["delete", "NoSuchProject", "--yes"])
 
-    assert "Project not found" in result.stderr
+    assert "project not found" in result.stderr
 
 
 def test_delete_confirmation_prompt_abort(runner, cli_db):
@@ -325,7 +325,7 @@ def test_delete_confirmation_prompt_accept(runner, cli_db):
         result = runner.invoke(project, ["delete", "ConfirmDelete"], input="y\n")
 
     assert result.exit_code == 0
-    assert "Project deleted." in result.output
+    assert "project deleted." in result.output
 
 
 def test_delete_leaves_other_projects_intact(runner, cli_db):
@@ -351,7 +351,7 @@ def test_set_default_by_name(runner, cli_db):
         result = runner.invoke(project, ["set-default", "MainProject"])
 
     assert result.exit_code == 0
-    assert "Default project set to: MainProject" in result.output
+    assert "default project set to: MainProject" in result.output
 
 
 def test_set_default_updates_config(runner, cli_db):
@@ -372,7 +372,7 @@ def test_set_default_by_uuid(runner, cli_db):
         result = runner.invoke(project, ["set-default", str(pid)])
 
     assert result.exit_code == 0
-    assert "Default project set to: UUIDDefault" in result.output
+    assert "default project set to: UUIDDefault" in result.output
 
 
 def test_set_default_marks_project_in_db(runner, cli_db):
@@ -407,7 +407,7 @@ def test_set_default_nonexistent_outputs_error(runner, cli_db):
          patch("bud.commands.projects.set_config_value"):
         result = runner.invoke(project, ["set-default", "GhostProject"])
 
-    assert "Project not found" in result.stderr
+    assert "project not found" in result.stderr
 
 
 def test_set_default_nonexistent_does_not_call_set_config(runner, cli_db):
@@ -437,7 +437,7 @@ def test_prjs_alias_empty(runner, cli_db):
         result = runner.invoke(cli, ["prjs"])
 
     assert result.exit_code == 0
-    assert "No projects found." in result.output
+    assert "no projects found." in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -449,7 +449,7 @@ def test_prj_alias_create(runner, cli_db):
         result = runner.invoke(cli, ["prj", "create", "--name", "ViaAlias"])
 
     assert result.exit_code == 0
-    assert "Created project: ViaAlias" in result.output
+    assert "created project: ViaAlias" in result.output
 
 
 def test_prj_alias_list(runner, cli_db):

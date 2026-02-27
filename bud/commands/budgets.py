@@ -23,19 +23,19 @@ def list_budgets(project_id, show_id):
         async with get_session() as db:
             pid = await resolve_project_id(db, project_id)
             if not pid:
-                click.echo("Error: no project specified. Use --project or set a default with `bud project set-default`.", err=True)
+                click.echo("error: no project specified. use --project or set a default with `bud project set-default`.", err=True)
                 return
             items = await budget_service.list_budgets(db, pid)
             if not items:
-                click.echo("No budgets found.")
+                click.echo("no budgets found.")
                 return
             if show_id:
                 rows = [[i + 1, str(b.id), b.name, str(b.start_date), str(b.end_date)] for i, b in enumerate(items)]
-                headers = ["#", "ID", "Month", "Start", "End"]
+                headers = ["#", "id", "month", "start", "end"]
             else:
                 rows = [[i + 1, b.name, str(b.start_date), str(b.end_date)] for i, b in enumerate(items)]
-                headers = ["#", "Month", "Start", "End"]
-            click.echo(tabulate(rows, headers=headers, tablefmt="psql"))
+                headers = ["#", "month", "start", "end"]
+            click.echo(tabulate(rows, headers=headers, tablefmt="presto"))
 
     run_async(_run())
 
@@ -49,10 +49,10 @@ def create_budget(month, project_id):
         async with get_session() as db:
             pid = await resolve_project_id(db, project_id)
             if not pid:
-                click.echo("Error: no project specified. Use --project or set a default with `bud project set-default`.", err=True)
+                click.echo("error: no project specified. use --project or set a default with `bud project set-default`.", err=True)
                 return
             b = await budget_service.create_budget(db, BudgetCreate(name=month, project_id=pid))
-            click.echo(f"Created budget: {b.name} (id: {b.id})")
+            click.echo(f"created budget: {b.name} (id: {b.id})")
 
     run_async(_run())
 
@@ -71,21 +71,21 @@ def edit_budget(counter, record_id, month, project_id):
             elif counter is not None:
                 pid = await resolve_project_id(db, project_id)
                 if not pid:
-                    click.echo("Error: --project required when using counter.", err=True)
+                    click.echo("error: --project required when using counter.", err=True)
                     return
                 items = await budget_service.list_budgets(db, pid)
                 if counter < 1 or counter > len(items):
-                    click.echo(f"Budget #{counter} not found in list.", err=True)
+                    click.echo(f"budget #{counter} not found in list.", err=True)
                     return
                 bid = items[counter - 1].id
             else:
-                click.echo("Error: provide a counter or --id.", err=True)
+                click.echo("error: provide a counter or --id.", err=True)
                 return
             b = await budget_service.update_budget(db, bid, BudgetUpdate(name=month))
             if not b:
-                click.echo("Budget not found.", err=True)
+                click.echo("budget not found.", err=True)
                 return
-            click.echo(f"Updated budget: {b.name}")
+            click.echo(f"updated budget: {b.name}")
 
     run_async(_run())
 
@@ -101,36 +101,36 @@ def delete_budget(budget_id, project_id, yes):
             if budget_id.isdigit():
                 pid = await resolve_project_id(db, project_id)
                 if not pid:
-                    click.echo("Error: --project required when using budget counter.", err=True)
+                    click.echo("error: --project required when using budget counter.", err=True)
                     return
                 items = await budget_service.list_budgets(db, pid)
                 n = int(budget_id)
                 if n < 1 or n > len(items):
-                    click.echo(f"Budget #{n} not found in list.", err=True)
+                    click.echo(f"budget #{n} not found in list.", err=True)
                     return
                 bid = items[n - 1].id
-                prompt = f"Delete budget #{n} (id: {bid})?"
+                prompt = f"delete budget #{n} (id: {bid})?"
             elif is_uuid(budget_id):
                 bid = uuid.UUID(budget_id)
-                prompt = f"Delete budget id: {bid}?"
+                prompt = f"delete budget id: {bid}?"
             else:
                 pid = await resolve_project_id(db, project_id)
                 if not pid:
-                    click.echo("Error: --project required when using month name for budget.", err=True)
+                    click.echo("error: --project required when using month name for budget.", err=True)
                     return
                 bid = await resolve_budget_id(db, budget_id, pid)
                 if not bid:
-                    click.echo(f"Budget not found: {budget_id}", err=True)
+                    click.echo(f"budget not found: {budget_id}", err=True)
                     return
-                prompt = f"Delete budget id: {bid}?"
+                prompt = f"delete budget id: {bid}?"
 
             if not yes:
                 click.confirm(prompt, abort=True)
 
             ok = await budget_service.delete_budget(db, bid)
             if not ok:
-                click.echo("Budget not found.", err=True)
+                click.echo("budget not found.", err=True)
                 return
-            click.echo("Budget deleted.")
+            click.echo("budget deleted.")
 
     run_async(_run())
