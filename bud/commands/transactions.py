@@ -28,27 +28,27 @@ def list_transactions(month, project_id, show_id):
         async with get_session() as db:
             pid = await resolve_project_id(db, project_id)
             if not pid:
-                click.echo("Error: no project specified. Use --project or set a default with `bud project set-default`.", err=True)
+                click.echo("error: no project specified. use --project or set a default with `bud project set-default`.", err=True)
                 return
             from bud.commands.utils import require_month
             m = require_month(month)
             items = await transaction_service.list_transactions(db, pid, m)
             if not items:
-                click.echo("No transactions found.")
+                click.echo("no transactions found.")
                 return
             if show_id:
                 rows = [
                     [i + 1, str(t.id), t.date, t.description, t.value, t.account.name]
                     for i, t in enumerate(items)
                 ]
-                headers = ["#", "ID", "Date", "Description", "Value", "Account"]
+                headers = ["#", "id", "date", "description", "value", "account"]
             else:
                 rows = [
                     [i + 1, t.date, t.description, t.value, t.account.name]
                     for i, t in enumerate(items)
                 ]
-                headers = ["#", "Date", "Description", "Value", "Account"]
-            click.echo(tabulate(rows, headers=headers, tablefmt="psql", floatfmt=".2f"))
+                headers = ["#", "date", "description", "value", "account"]
+            click.echo(tabulate(rows, headers=headers, tablefmt="presto", floatfmt=".2f"))
 
     run_async(_run())
 
@@ -61,15 +61,15 @@ def show_transaction(transaction_id):
         async with get_session() as db:
             t = await transaction_service.get_transaction(db, uuid.UUID(transaction_id))
             if not t:
-                click.echo("Transaction not found.", err=True)
+                click.echo("transaction not found.", err=True)
                 return
-            click.echo(f"ID:          {t.id}")
-            click.echo(f"Date:        {t.date}")
-            click.echo(f"Description: {t.description}")
-            click.echo(f"Value:       {t.value}")
-            click.echo(f"Account:     {t.account.name}")
-            click.echo(f"Category:    {t.category_id or '-'}")
-            click.echo(f"Tags:        {', '.join(t.tags) if t.tags else '-'}")
+            click.echo(f"id:          {t.id}")
+            click.echo(f"date:        {t.date}")
+            click.echo(f"description: {t.description}")
+            click.echo(f"value:       {t.value}")
+            click.echo(f"account:     {t.account.name}")
+            click.echo(f"category:    {t.category_id or '-'}")
+            click.echo(f"tags:        {', '.join(t.tags) if t.tags else '-'}")
 
     run_async(_run())
 
@@ -91,12 +91,12 @@ def create_transaction(value, description, txn_date, account_id, project_id, cat
         async with get_session() as db:
             pid = await resolve_project_id(db, project_id)
             if not pid:
-                click.echo("Error: no project specified. Use --project or set a default with `bud project set-default`.", err=True)
+                click.echo("error: no project specified. use --project or set a default with `bud project set-default`.", err=True)
                 return
 
             acc = await resolve_account_id(db, account_id, pid)
             if not acc:
-                click.echo(f"Account not found: {account_id}", err=True)
+                click.echo(f"account not found: {account_id}", err=True)
                 return
 
             cat = None
@@ -104,14 +104,14 @@ def create_transaction(value, description, txn_date, account_id, project_id, cat
                 cat = await resolve_category_id(db, category_id)
                 if not cat:
                     if is_uuid(category_id):
-                        click.echo(f"Category not found: {category_id}", err=True)
+                        click.echo(f"category not found: {category_id}", err=True)
                         return
-                    if click.confirm(f"Category '{category_id}' not found. Create it?", default=False):
+                    if click.confirm(f"category '{category_id}' not found. create it?", default=False):
                         from bud.schemas.category import CategoryCreate
                         from bud.services import categories as category_service
                         new_cat = await category_service.create_category(db, CategoryCreate(name=category_id))
                         cat = new_cat.id
-                        click.echo(f"Created category: {new_cat.name}")
+                        click.echo(f"created category: {new_cat.name}")
                     else:
                         return
 
@@ -124,7 +124,7 @@ def create_transaction(value, description, txn_date, account_id, project_id, cat
                 category_id=cat,
                 tags=tag_list,
             ))
-            click.echo(f"Created transaction: {t.description} ({t.value}) id: {t.id}")
+            click.echo(f"created transaction: {t.description} ({t.value}) id: {t.id}")
 
     run_async(_run())
 
@@ -148,16 +148,16 @@ def edit_transaction(counter, record_id, value, description, txn_date, category_
             elif counter is not None:
                 pid = await resolve_project_id(db, project_id)
                 if not pid:
-                    click.echo("Error: --project required when using counter.", err=True)
+                    click.echo("error: --project required when using counter.", err=True)
                     return
                 m = require_month(month)
                 items = await transaction_service.list_transactions(db, pid, m)
                 if counter < 1 or counter > len(items):
-                    click.echo(f"Transaction #{counter} not found in list.", err=True)
+                    click.echo(f"transaction #{counter} not found in list.", err=True)
                     return
                 tid = items[counter - 1].id
             else:
-                click.echo("Error: provide a counter or --id.", err=True)
+                click.echo("error: provide a counter or --id.", err=True)
                 return
 
             d = date_type.fromisoformat(txn_date) if txn_date else None
@@ -168,14 +168,14 @@ def edit_transaction(counter, record_id, value, description, txn_date, category_
                 cat = await resolve_category_id(db, category_id)
                 if not cat:
                     if is_uuid(category_id):
-                        click.echo(f"Category not found: {category_id}", err=True)
+                        click.echo(f"category not found: {category_id}", err=True)
                         return
-                    if click.confirm(f"Category '{category_id}' not found. Create it?", default=False):
+                    if click.confirm(f"category '{category_id}' not found. create it?", default=False):
                         from bud.schemas.category import CategoryCreate
                         from bud.services import categories as category_service
                         new_cat = await category_service.create_category(db, CategoryCreate(name=category_id))
                         cat = new_cat.id
-                        click.echo(f"Created category: {new_cat.name}")
+                        click.echo(f"created category: {new_cat.name}")
                     else:
                         return
 
@@ -187,9 +187,9 @@ def edit_transaction(counter, record_id, value, description, txn_date, category_
                 tags=tag_list,
             ))
             if not t:
-                click.echo("Transaction not found.", err=True)
+                click.echo("transaction not found.", err=True)
                 return
-            click.echo(f"Updated transaction: {t.description}")
+            click.echo(f"updated transaction: {t.description}")
 
     run_async(_run())
 
@@ -207,28 +207,28 @@ def delete_transaction(transaction_id, month, project_id, yes):
                 from bud.commands.utils import require_month
                 pid = await resolve_project_id(db, project_id)
                 if not pid:
-                    click.echo("Error: no project specified. Use --project or set a default with `bud project set-default`.", err=True)
+                    click.echo("error: no project specified. use --project or set a default with `bud project set-default`.", err=True)
                     return
                 m = require_month(month)
                 items = await transaction_service.list_transactions(db, pid, m)
                 n = int(transaction_id)
                 if n < 1 or n > len(items):
-                    click.echo(f"Transaction #{n} not found in list.", err=True)
+                    click.echo(f"transaction #{n} not found in list.", err=True)
                     return
                 t = items[n - 1]
                 tid = t.id
-                prompt = f"Delete transaction #{n} (id: {tid})?"
+                prompt = f"delete transaction #{n} (id: {tid})?"
             else:
                 tid = uuid.UUID(transaction_id)
-                prompt = f"Delete transaction id: {tid}?"
+                prompt = f"delete transaction id: {tid}?"
 
             if not yes:
                 click.confirm(prompt, abort=True)
 
             ok = await transaction_service.delete_transaction(db, tid)
             if not ok:
-                click.echo("Transaction not found.", err=True)
+                click.echo("transaction not found.", err=True)
                 return
-            click.echo("Transaction deleted.")
+            click.echo("transaction deleted.")
 
     run_async(_run())

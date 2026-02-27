@@ -28,11 +28,11 @@ async def _resolve_budget_id(db, budget_id, project_id):
         return uuid.UUID(budget_id)
     pid = await resolve_project_id(db, project_id)
     if not pid:
-        click.echo("Error: --project required when using month name for budget.", err=True)
+        click.echo("error: --project required when using month name for budget.", err=True)
         return None
     bid = await resolve_budget_id(db, budget_id, pid)
     if not bid:
-        click.echo(f"Budget not found: {budget_id}", err=True)
+        click.echo(f"budget not found: {budget_id}", err=True)
         return None
     return bid
 
@@ -52,7 +52,7 @@ async def _resolve_or_create_budget_id(db, budget_id, project_id):
     # Need a project for lookup / creation
     pid = await resolve_project_id(db, project_id)
     if not pid:
-        click.echo("Error: --project required to resolve or create budget.", err=True)
+        click.echo("error: --project required to resolve or create budget.", err=True)
         return None
 
     month = budget_id if budget_id else require_month()
@@ -62,7 +62,7 @@ async def _resolve_or_create_budget_id(db, budget_id, project_id):
         return existing.id
 
     b = await budget_service.create_budget(db, BudgetCreate(name=month, project_id=pid))
-    click.echo(f"Auto-created budget: {b.name}")
+    click.echo(f"auto-created budget: {b.name}")
     return b.id
 
 
@@ -78,12 +78,12 @@ def list_forecasts(budget_id, project_id, show_id):
             if budget_id is None or not is_uuid(budget_id):
                 pid = await resolve_project_id(db, project_id)
                 if not pid:
-                    click.echo("Error: --project required to resolve budget.", err=True)
+                    click.echo("error: --project required to resolve budget.", err=True)
                     return
                 month = budget_id if budget_id else require_month()
                 existing = await budget_service.get_budget_by_name(db, pid, month)
                 if not existing:
-                    click.echo("No forecasts found.")
+                    click.echo("no forecasts found.")
                     return
                 bid = existing.id
             else:
@@ -92,7 +92,7 @@ def list_forecasts(budget_id, project_id, show_id):
                     return
             items = await forecast_service.list_forecasts(db, bid)
             if not items:
-                click.echo("No forecasts found.")
+                click.echo("no forecasts found.")
                 return
 
             def _display_description(f):
@@ -106,15 +106,15 @@ def list_forecasts(budget_id, project_id, show_id):
                     return ""
                 if f.installment is not None:
                     return f"{f.installment}/{f.recurrence.installments}" if f.recurrence and f.recurrence.installments else str(f.installment)
-                return "Yes"
+                return "yes"
 
             if show_id:
                 rows = [[i + 1, str(f.id), _display_description(f), f.value, f.category.name if f.category else "", ", ".join(f.tags) if f.tags else "", _recurrence_label(f)] for i, f in enumerate(items)]
-                headers = ["#", "ID", "Description", "Value", "Category", "Tags", "Recurrence"]
+                headers = ["#", "id", "description", "value", "category", "tags", "recurrence"]
             else:
                 rows = [[i + 1, _display_description(f), f.value, f.category.name if f.category else "", ", ".join(f.tags) if f.tags else "", _recurrence_label(f)] for i, f in enumerate(items)]
-                headers = ["#", "Description", "Value", "Category", "Tags", "Recurrence"]
-            click.echo(tabulate(rows, headers=headers, tablefmt="psql", floatfmt=".2f"))
+                headers = ["#", "description", "value", "category", "tags", "recurrence"]
+            click.echo(tabulate(rows, headers=headers, tablefmt="presto", floatfmt=".2f"))
 
     run_async(_run())
 
@@ -139,7 +139,7 @@ def create_forecast(budget_id, description, value, category_id, tags, recurrent,
     async def _run():
         tag_list = [t.strip() for t in tags.split(",")] if tags else []
         if not description and not category_id and not tag_list:
-            click.echo("Error: at least one of --description, --category, or --tags is required.", err=True)
+            click.echo("error: at least one of --description, --category, or --tags is required.", err=True)
             return
         async with get_session() as db:
             bid = await _resolve_or_create_budget_id(db, budget_id, project_id)
@@ -150,10 +150,10 @@ def create_forecast(budget_id, description, value, category_id, tags, recurrent,
             if category_id:
                 cat = await resolve_category_id(db, category_id)
                 if not cat:
-                    if not click.confirm(f"Category '{category_id}' not found. Create it?"):
+                    if not click.confirm(f"category '{category_id}' not found. create it?"):
                         return
                     new_cat = await category_service.create_category(db, CategoryCreate(name=category_id))
-                    click.echo(f"Created category: {new_cat.name}")
+                    click.echo(f"created category: {new_cat.name}")
                     cat = new_cat.id
 
             # Resolve the budget to get its month name and project_id
@@ -162,10 +162,10 @@ def create_forecast(budget_id, description, value, category_id, tags, recurrent,
             is_recurrent = recurrent or recurrence_end is not None or installments is not None
 
             if current_installment is not None and not installments:
-                click.echo("Error: --current-installment requires --installments.", err=True)
+                click.echo("error: --current-installment requires --installments.", err=True)
                 return
             if current_installment is not None and (current_installment < 1 or current_installment > installments):
-                click.echo(f"Error: --current-installment must be between 1 and {installments}.", err=True)
+                click.echo(f"error: --current-installment must be between 1 and {installments}.", err=True)
                 return
 
             if is_recurrent and installments:
@@ -223,7 +223,7 @@ def create_forecast(budget_id, description, value, category_id, tags, recurrent,
 
                 label = description or f"id: {first_forecast.id}"
                 remaining = installments - first_inst + 1
-                click.echo(f"Created recurrent forecast: {label} ({remaining} installments, {first_inst}/{installments} to {installments}/{installments})")
+                click.echo(f"created recurrent forecast: {label} ({remaining} installments, {first_inst}/{installments} to {installments}/{installments})")
 
             elif is_recurrent:
                 # Open-ended or end-bounded recurrence
@@ -268,7 +268,7 @@ def create_forecast(budget_id, description, value, category_id, tags, recurrent,
 
                 label = description or f"id: {first_forecast.id}"
                 end_info = f" until {recurrence_end}" if recurrence_end else ""
-                click.echo(f"Created recurrent forecast: {label} ({value}){end_info}")
+                click.echo(f"created recurrent forecast: {label} ({value}){end_info}")
 
             else:
                 # Simple non-recurrent forecast
@@ -280,7 +280,7 @@ def create_forecast(budget_id, description, value, category_id, tags, recurrent,
                     tags=tag_list,
                 ))
                 label = f.description or f"id: {f.id}"
-                click.echo(f"Created forecast: {label} ({f.value})")
+                click.echo(f"created forecast: {label} ({f.value})")
 
     run_async(_run())
 
@@ -312,28 +312,28 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, rec
                     from bud.commands.utils import require_month
                     pid = await resolve_project_id(db, project_id)
                     if not pid:
-                        click.echo("Error: --project required to resolve budget.", err=True)
+                        click.echo("error: --project required to resolve budget.", err=True)
                         return
                     month = require_month()
                     existing = await budget_service.get_budget_by_name(db, pid, month)
                     if not existing:
-                        click.echo(f"Budget not found: {month}", err=True)
+                        click.echo(f"budget not found: {month}", err=True)
                         return
                     bid = existing.id
                 items = await forecast_service.list_forecasts(db, bid)
                 if counter < 1 or counter > len(items):
-                    click.echo(f"Forecast #{counter} not found in list.", err=True)
+                    click.echo(f"forecast #{counter} not found in list.", err=True)
                     return
                 fid = items[counter - 1].id
             else:
-                click.echo("Error: provide a counter or --id.", err=True)
+                click.echo("error: provide a counter or --id.", err=True)
                 return
 
             cat = None
             if category_id:
                 cat = await resolve_category_id(db, category_id)
                 if not cat:
-                    click.echo(f"Category not found: {category_id}", err=True)
+                    click.echo(f"category not found: {category_id}", err=True)
                     return
 
             f = await forecast_service.update_forecast(db, fid, ForecastUpdate(
@@ -343,7 +343,7 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, rec
                 tags=tag_list,
             ))
             if not f:
-                click.echo("Forecast not found.", err=True)
+                click.echo("forecast not found.", err=True)
                 return
 
             # If description changed on a recurrent forecast, update the recurrence's base_description
@@ -357,7 +357,7 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, rec
             is_recurrent = recurrent or recurrence_end is not None
             if is_recurrent:
                 if f.recurrence_id is not None:
-                    click.echo("Error: forecast is already recurrent.", err=True)
+                    click.echo("error: forecast is already recurrent.", err=True)
                     return
 
                 budget_obj = await budget_service.get_budget(db, f.budget_id)
@@ -395,9 +395,9 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, rec
                     created += 1
 
                 end_info = f" until {recurrence_end}" if recurrence_end else ""
-                click.echo(f"Updated forecast: {f.description} (now recurrent{end_info}, {created} forecasts added)")
+                click.echo(f"updated forecast: {f.description} (now recurrent{end_info}, {created} forecasts added)")
             else:
-                click.echo(f"Updated forecast: {f.description}")
+                click.echo(f"updated forecast: {f.description}")
 
     run_async(_run())
 
@@ -420,32 +420,32 @@ def delete_forecast(forecast_id, budget_id, project_id, yes):
                     from bud.commands.utils import require_month
                     pid = await resolve_project_id(db, project_id)
                     if not pid:
-                        click.echo("Error: --project required to resolve budget.", err=True)
+                        click.echo("error: --project required to resolve budget.", err=True)
                         return
                     month = require_month()
                     existing = await budget_service.get_budget_by_name(db, pid, month)
                     if not existing:
-                        click.echo(f"Budget not found: {month}", err=True)
+                        click.echo(f"budget not found: {month}", err=True)
                         return
                     bid = existing.id
                 items = await forecast_service.list_forecasts(db, bid)
                 n = int(forecast_id)
                 if n < 1 or n > len(items):
-                    click.echo(f"Forecast #{n} not found in list.", err=True)
+                    click.echo(f"forecast #{n} not found in list.", err=True)
                     return
                 fid = items[n - 1].id
-                prompt = f"Delete forecast #{n} (id: {fid})?"
+                prompt = f"delete forecast #{n} (id: {fid})?"
             else:
                 fid = uuid.UUID(forecast_id)
-                prompt = f"Delete forecast id: {fid}?"
+                prompt = f"delete forecast id: {fid}?"
 
             if not yes:
                 click.confirm(prompt, abort=True)
 
             ok = await forecast_service.delete_forecast(db, fid)
             if not ok:
-                click.echo("Forecast not found.", err=True)
+                click.echo("forecast not found.", err=True)
                 return
-            click.echo("Forecast deleted.")
+            click.echo("forecast deleted.")
 
     run_async(_run())
