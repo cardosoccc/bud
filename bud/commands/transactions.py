@@ -19,7 +19,7 @@ def transaction():
 
 
 @transaction.command("list")
-@click.option("--month", default=None, help="YYYY-MM")
+@click.argument("month", default=None, required=False)
 @click.option("--project", "project_id", default=None, help="Project UUID or name")
 @click.option("--show-id", is_flag=True, default=False, help="Show transaction UUIDs")
 def list_transactions(month, project_id, show_id):
@@ -38,16 +38,16 @@ def list_transactions(month, project_id, show_id):
                 return
             if show_id:
                 rows = [
-                    [i + 1, str(t.id), t.date, t.description, t.value, t.account.name]
+                    [i + 1, str(t.id), t.date, t.description, t.value, t.category.name if t.category else "", ", ".join(t.tags) if t.tags else "", t.account.name]
                     for i, t in enumerate(items)
                 ]
-                headers = ["#", "id", "date", "description", "value", "account"]
+                headers = ["#", "id", "date", "description", "value", "category", "tags", "account"]
             else:
                 rows = [
-                    [i + 1, t.date, t.description, t.value, t.account.name]
+                    [i + 1, t.date, t.description, t.value, t.category.name if t.category else "", ", ".join(t.tags) if t.tags else "", t.account.name]
                     for i, t in enumerate(items)
                 ]
-                headers = ["#", "date", "description", "value", "account"]
+                headers = ["#", "date", "description", "value", "category", "tags", "account"]
             click.echo(tabulate(rows, headers=headers, tablefmt="presto", floatfmt=".2f"))
 
     run_async(_run())
@@ -137,7 +137,7 @@ def create_transaction(value, description, txn_date, account_id, project_id, cat
 @click.option("--date", "txn_date", default=None)
 @click.option("--category", "category_id", default=None, help="Category UUID or name")
 @click.option("--tags", default=None, help="Comma-separated tags")
-@click.option("--month", default=None, help="YYYY-MM (required when using counter)")
+@click.argument("month", default=None, required=False)
 @click.option("--project", "project_id", default=None, help="Project UUID or name (required when using counter)")
 def edit_transaction(counter, record_id, value, description, txn_date, category_id, tags, month, project_id):
     """Edit a transaction. Specify by list counter (default) or --id."""
@@ -196,7 +196,7 @@ def edit_transaction(counter, record_id, value, description, txn_date, category_
 
 @transaction.command("delete")
 @click.argument("transaction_id")
-@click.option("--month", default=None, help="YYYY-MM (required when TRANSACTION_ID is a counter)")
+@click.argument("month", default=None, required=False)
 @click.option("--project", "project_id", default=None, help="Project UUID or name (required when TRANSACTION_ID is a counter)")
 @click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
 def delete_transaction(transaction_id, month, project_id, yes):

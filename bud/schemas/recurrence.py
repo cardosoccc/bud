@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
-from typing import Optional
+from decimal import Decimal
+from typing import Optional, List
 
 from pydantic import BaseModel
 
@@ -10,7 +11,9 @@ class RecurrenceCreate(BaseModel):
     end: Optional[str] = None  # YYYY-MM
     installments: Optional[int] = None
     base_description: Optional[str] = None
-    original_forecast_id: uuid.UUID
+    value: Decimal
+    category_id: Optional[uuid.UUID] = None
+    tags: List[str] = []
     project_id: uuid.UUID
 
 
@@ -20,8 +23,20 @@ class RecurrenceRead(BaseModel):
     end: Optional[str] = None
     installments: Optional[int] = None
     base_description: Optional[str] = None
-    original_forecast_id: uuid.UUID
+    value: Decimal
+    category_id: Optional[uuid.UUID] = None
+    tags: List[str] = []
     project_id: uuid.UUID
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class RecurrenceUpdate(BaseModel):
+    base_description: Optional[str] = None
+    value: Optional[Decimal] = None
+    category_id: Optional[uuid.UUID] = None
+    tags: Optional[List[str]] = None
+    start: Optional[str] = None
+    end: Optional[str] = None
+    installments: Optional[int] = None

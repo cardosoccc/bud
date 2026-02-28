@@ -426,7 +426,7 @@ def test_prjs_alias_lists_projects(runner, cli_db):
     asyncio.run(_seed(cli_db, "AliasProject"))
 
     with patch("bud.commands.projects.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(cli, ["prjs"])
+        result = runner.invoke(cli, ["pp"])
 
     assert result.exit_code == 0
     assert "AliasProject" in result.output
@@ -434,7 +434,7 @@ def test_prjs_alias_lists_projects(runner, cli_db):
 
 def test_prjs_alias_empty(runner, cli_db):
     with patch("bud.commands.projects.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(cli, ["prjs"])
+        result = runner.invoke(cli, ["pp"])
 
     assert result.exit_code == 0
     assert "no projects found." in result.output
@@ -446,7 +446,7 @@ def test_prjs_alias_empty(runner, cli_db):
 
 def test_prj_alias_create(runner, cli_db):
     with patch("bud.commands.projects.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(cli, ["prj", "create", "--name", "ViaAlias"])
+        result = runner.invoke(cli, ["p", "create", "--name", "ViaAlias"])
 
     assert result.exit_code == 0
     assert "created project: ViaAlias" in result.output
@@ -456,7 +456,7 @@ def test_prj_alias_list(runner, cli_db):
     asyncio.run(_seed(cli_db, "PrjAlias"))
 
     with patch("bud.commands.projects.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(cli, ["prj", "list"])
+        result = runner.invoke(cli, ["p", "list"])
 
     assert result.exit_code == 0
     assert "PrjAlias" in result.output

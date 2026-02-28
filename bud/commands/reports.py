@@ -80,8 +80,10 @@ def report(budget_id, project_id):
                 click.echo(f"error: {e}", err=True)
                 return
 
-            click.echo(f"\n# {r.budget_name} ({r.start_date} / {r.end_date})")
-
+            click.echo(f"\n# {r.budget_name} ({r.start_date} / {r.end_date})\n")
+            click.echo("-" * 118)
+            click.echo("## balances")
+            click.echo("-" * 118)
             total_remaining = sum(f.difference for f in r.forecasts) if r.forecasts else Decimal("0")
 
             if r.account_balances:
@@ -97,7 +99,7 @@ def report(budget_id, project_id):
                 exp_calc = total_calc + acc_remaining
                 exp_curr = total_curr + acc_remaining
                 expected_row = _fmt_row(["expected", exp_calc, exp_curr, total_diff], _T1_WIDTHS, _T1_NUM)
-                click.echo(f"\n{table}\n{sep}\n{total_row}\n{sep}\n{expected_row}")
+                click.echo(f"{table}\n{sep}\n{total_row}\n{sep}\n{expected_row}")
 
             if r.forecasts or (r.is_projected and r.accumulated_remaining is not None):
                 def _display_desc(f):
@@ -116,7 +118,11 @@ def report(budget_id, project_id):
                 table = _build_table(_T2_HEADERS, rows, _T2_WIDTHS, _T2_NUM)
                 sep = _separator(_T2_WIDTHS)
                 total_row = _fmt_row(["total", "", "", total_forecasted, total_current, total_remaining], _T2_WIDTHS, _T2_NUM)
-                output = f"\n{table}\n{sep}\n{total_row}"
+                click.echo("\n")
+                click.echo("-" * 118)
+                click.echo("## forecasts")
+                click.echo("-" * 118)
+                output = f"{table}\n{sep}\n{total_row}"
 
                 is_future = r.start_date > date.today()
                 if is_future and r.accumulated_remaining is not None:

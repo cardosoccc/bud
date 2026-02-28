@@ -72,22 +72,18 @@ async def _populate_recurrent_forecasts(db: AsyncSession, budget: Budget) -> Non
         if already_exists:
             continue
 
-        orig = rec.original_forecast
         installment_num = None
-
         if rec.installments:
             installment_num = get_installment_number(rec, budget.name)
-
-        desc = orig.description
 
         await forecast_service.create_forecast(
             db,
             ForecastCreate(
-                description=desc,
-                value=Decimal(str(orig.value)),
+                description=rec.base_description,
+                value=Decimal(str(rec.value)),
                 budget_id=budget.id,
-                category_id=orig.category_id,
-                tags=orig.tags or [],
+                category_id=rec.category_id,
+                tags=rec.tags or [],
                 recurrence_id=rec.id,
                 installment=installment_num,
             ),

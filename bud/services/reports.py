@@ -120,10 +120,14 @@ async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
         if forecast.recurrence and forecast.recurrence.installments:
             total_installments = forecast.recurrence.installments
 
+        desc = forecast.description
+        if forecast.recurrence and forecast.recurrence.base_description:
+            desc = forecast.recurrence.base_description
+
         forecast_actuals.append(
             ForecastActual(
                 forecast_id=forecast.id,
-                description=forecast.description,
+                description=desc,
                 forecast_value=forecast_val,
                 actual_value=actual,
                 difference=forecast_val - actual,

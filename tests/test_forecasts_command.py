@@ -202,7 +202,7 @@ class TestCreateDescriptionOptional:
         asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
         result = _invoke(runner, cli_db, [
             "create", "--value", "-100", "--description", "Rent",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
         ])
         assert result.exit_code == 0
         assert "created forecast" in result.output
@@ -213,7 +213,7 @@ class TestCreateDescriptionOptional:
         cat_id, _ = asyncio.run(_seed_category(cli_db, "Food"))
         result = _invoke(runner, cli_db, [
             "create", "--value", "-200", "--category", str(cat_id),
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
         ])
         assert result.exit_code == 0
         assert "created forecast" in result.output
@@ -223,7 +223,7 @@ class TestCreateDescriptionOptional:
         asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
         result = _invoke(runner, cli_db, [
             "create", "--value", "-50", "--tags", "groceries,weekly",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
         ])
         assert result.exit_code == 0
         assert "created forecast" in result.output
@@ -233,7 +233,7 @@ class TestCreateDescriptionOptional:
         asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
         result = _invoke(runner, cli_db, [
             "create", "--value", "-100",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
         ])
         assert result.exit_code == 0  # click doesn't set exit_code=1 for echo
         assert "at least one of" in result.output
@@ -245,7 +245,7 @@ class TestCreateDescriptionOptional:
         result = _invoke(runner, cli_db, [
             "create", "--value", "-80", "--description", "Uber",
             "--category", str(cat_id), "--tags", "ride",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
         ])
         assert result.exit_code == 0
         assert "created forecast" in result.output
@@ -261,14 +261,14 @@ class TestCreateAutoCategory:
         asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
         result = _invoke(runner, cli_db, [
             "create", "--value", "-100", "--category", "NewCat",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
         ])
         # click.confirm will read 'y' from default input (empty → abort)
         # Use runner with input='y\n'
         with patch("bud.commands.forecasts.get_session", _make_get_session(cli_db)):
             result = runner.invoke(forecast, [
                 "create", "--value", "-100", "--category", "NewCat",
-                "--budget", "2025-01", "--project", "proj",
+                "2025-01", "--project", "proj",
             ], input="y\n")
         assert result.exit_code == 0
         assert "created category: NewCat" in result.output
@@ -280,7 +280,7 @@ class TestCreateAutoCategory:
         with patch("bud.commands.forecasts.get_session", _make_get_session(cli_db)):
             result = runner.invoke(forecast, [
                 "create", "--value", "-100", "--category", "NewCat",
-                "--budget", "2025-01", "--project", "proj",
+                "2025-01", "--project", "proj",
             ], input="n\n")
         assert "created forecast" not in result.output
 
@@ -295,7 +295,7 @@ class TestListShowsCategoryAndTags:
         bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
         cat_id, _ = asyncio.run(_seed_category(cli_db, "Food"))
         asyncio.run(_seed_forecast(cli_db, bid, value=-200, description="Groceries", category_id=cat_id))
-        result = _invoke(runner, cli_db, ["list", "--budget", "2025-01", "--project", "proj"])
+        result = _invoke(runner, cli_db, ["list", "2025-01", "--project", "proj"])
         assert result.exit_code == 0
         assert "category" in result.output
         assert "Food" in result.output
@@ -304,7 +304,7 @@ class TestListShowsCategoryAndTags:
         pid, _ = asyncio.run(_seed_project(cli_db, "proj", is_default=True))
         bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
         asyncio.run(_seed_forecast(cli_db, bid, value=-50, description="Snacks", tags=["weekly", "food"]))
-        result = _invoke(runner, cli_db, ["list", "--budget", "2025-01", "--project", "proj"])
+        result = _invoke(runner, cli_db, ["list", "2025-01", "--project", "proj"])
         assert result.exit_code == 0
         assert "tags" in result.output
         assert "weekly" in result.output
@@ -314,7 +314,7 @@ class TestListShowsCategoryAndTags:
         pid, _ = asyncio.run(_seed_project(cli_db, "proj", is_default=True))
         bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
         asyncio.run(_seed_forecast(cli_db, bid, value=-100, tags=["rent"]))
-        result = _invoke(runner, cli_db, ["list", "--budget", "2025-01", "--project", "proj"])
+        result = _invoke(runner, cli_db, ["list", "2025-01", "--project", "proj"])
         assert result.exit_code == 0
         assert "rent" in result.output
 

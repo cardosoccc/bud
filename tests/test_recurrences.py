@@ -166,7 +166,7 @@ class TestInstallmentRecurrence:
 
         result = _invoke_forecast(runner, cli_db, [
             "create", "--value", "-120", "--description", "Annual Plan",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
             "--installments", "3",
         ])
         assert result.exit_code == 0
@@ -186,7 +186,7 @@ class TestInstallmentRecurrence:
 
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-100", "--description", "Netflix",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
             "--installments", "3",
         ])
 
@@ -207,7 +207,7 @@ class TestInstallmentRecurrence:
 
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-60", "--description", "Sub",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
             "--installments", "3",
         ])
 
@@ -222,7 +222,7 @@ class TestInstallmentRecurrence:
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-50", "--description", "Service",
             "--category", str(cat_id), "--tags", "monthly,auto",
-            "--budget", "2025-06", "--project", "proj",
+            "2025-06", "--project", "proj",
             "--installments", "2",
         ])
 
@@ -246,7 +246,7 @@ class TestOpenEndedRecurrence:
 
         result = _invoke_forecast(runner, cli_db, [
             "create", "--value", "-100", "--description", "Rent",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
             "--recurrent",
         ])
         assert result.exit_code == 0
@@ -271,7 +271,7 @@ class TestOpenEndedRecurrence:
 
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-100", "--description", "Rent",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
             "--recurrence-end", "2025-03",
         ])
 
@@ -292,7 +292,7 @@ class TestOpenEndedRecurrence:
 
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-50", "--description", "Insurance",
-            "--budget", "2025-02", "--project", "proj",
+            "2025-02", "--project", "proj",
             "--recurrent",
         ])
 
@@ -318,7 +318,7 @@ class TestBudgetCreationPopulatesRecurrences:
         # Create a recurrent forecast
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-200", "--description", "Salary",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
             "--recurrent",
         ])
 
@@ -338,7 +338,7 @@ class TestBudgetCreationPopulatesRecurrences:
 
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-100", "--description", "Temp",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
             "--recurrence-end", "2025-02",
         ])
 
@@ -363,7 +363,7 @@ class TestBudgetCreationPopulatesRecurrences:
 
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-300", "--description", "Amazon",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
             "--installments", "3",
         ])
 
@@ -390,7 +390,7 @@ class TestBudgetCreationPopulatesRecurrences:
 
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-100", "--description", "Late Start",
-            "--budget", "2025-03", "--project", "proj",
+            "2025-03", "--project", "proj",
             "--recurrent",
         ])
 
@@ -439,7 +439,7 @@ class TestEdgeCases:
 
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-100", "--description", "YearCross",
-            "--budget", "2025-11", "--project", "proj",
+            "2025-11", "--project", "proj",
             "--installments", "3",
         ])
 
@@ -454,7 +454,7 @@ class TestEdgeCases:
 
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-50", "--description", "NoDup",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
             "--installments", "2",
         ])
 
@@ -471,7 +471,7 @@ class TestEdgeCases:
 
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-75", "--tags", "utilities",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
             "--recurrent",
         ])
 
@@ -490,13 +490,13 @@ class TestEdgeCases:
         # Create a non-recurrent forecast
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-100", "--description", "Gym",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
         ])
 
         # Edit it to be recurrent
         result = _invoke_forecast(runner, cli_db, [
             "edit", "1", "--recurrent",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
         ])
         assert result.exit_code == 0
         assert "now recurrent" in result.output
@@ -520,12 +520,12 @@ class TestEdgeCases:
 
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-50", "--description", "Temp Sub",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
         ])
 
         result = _invoke_forecast(runner, cli_db, [
             "edit", "1", "--recurrence-end", "2025-03",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
         ])
         assert result.exit_code == 0
         assert "until 2025-03" in result.output
@@ -545,13 +545,13 @@ class TestEdgeCases:
 
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-100", "--description", "Rent",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
             "--recurrent",
         ])
 
         result = _invoke_forecast(runner, cli_db, [
             "edit", "1", "--recurrent",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
         ])
         assert "already recurrent" in result.output
 
@@ -562,12 +562,12 @@ class TestEdgeCases:
 
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-200", "--description", "Insurance",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
         ])
 
         _invoke_forecast(runner, cli_db, [
             "edit", "1", "--recurrent",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
         ])
 
         # Create a new budget — should auto-get the forecast
@@ -587,12 +587,12 @@ class TestEdgeCases:
 
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-100", "--description", "Gym",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
         ])
 
         _invoke_forecast(runner, cli_db, [
             "edit", "1", "--recurrent", "--value", "-150",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
         ])
 
         # Original forecast should have updated value
@@ -614,7 +614,7 @@ class TestEdgeCases:
 
         result = _invoke_forecast(runner, cli_db, [
             "create", "--value", "-100", "--description", "Washer",
-            "--budget", "2025-06", "--project", "proj",
+            "2025-06", "--project", "proj",
             "--installments", "10", "--current-installment", "5",
         ])
         assert result.exit_code == 0
@@ -646,7 +646,7 @@ class TestEdgeCases:
 
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-50", "--description", "Phone",
-            "--budget", "2025-06", "--project", "proj",
+            "2025-06", "--project", "proj",
             "--installments", "8", "--current-installment", "3",
         ])
 
@@ -670,7 +670,7 @@ class TestEdgeCases:
 
         result = _invoke_forecast(runner, cli_db, [
             "create", "--value", "-100", "--description", "Bad",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
             "--current-installment", "3",
         ])
         assert result.exit_code == 0
@@ -683,7 +683,7 @@ class TestEdgeCases:
 
         result = _invoke_forecast(runner, cli_db, [
             "create", "--value", "-100", "--description", "Bad",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
             "--installments", "5", "--current-installment", "7",
         ])
         assert result.exit_code == 0
@@ -696,7 +696,7 @@ class TestEdgeCases:
 
         _invoke_forecast(runner, cli_db, [
             "create", "--value", "-50", "--tags", "sub",
-            "--budget", "2025-01", "--project", "proj",
+            "2025-01", "--project", "proj",
             "--installments", "2",
         ])
 

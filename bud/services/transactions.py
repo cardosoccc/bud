@@ -32,7 +32,7 @@ async def list_transactions(
 
     result = await db.execute(
         select(Transaction)
-        .options(selectinload(Transaction.account))
+        .options(selectinload(Transaction.account), selectinload(Transaction.category))
         .where(and_(*conditions))
         .order_by(Transaction.date.desc())
     )

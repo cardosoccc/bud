@@ -67,7 +67,7 @@ async def _resolve_or_create_budget_id(db, budget_id, project_id):
 
 
 @forecast.command("list")
-@click.option("--budget", "budget_id", default=None, help="Budget UUID or month name (YYYY-MM); defaults to current month")
+@click.argument("budget_id", default=None, required=False)
 @click.option("--project", "project_id", default=None, help="Project UUID or name")
 @click.option("--show-id", is_flag=True, default=False, help="Show forecast UUIDs")
 def list_forecasts(budget_id, project_id, show_id):
@@ -96,7 +96,7 @@ def list_forecasts(budget_id, project_id, show_id):
                 return
 
             def _display_description(f):
-                desc = f.description or ""
+                desc = (f.recurrence.base_description if f.recurrence and f.recurrence.base_description else f.description) or ""
                 if f.installment is not None and f.recurrence and f.recurrence.installments:
                     desc = f"{desc} ({f.installment}/{f.recurrence.installments})".strip()
                 return desc
@@ -120,7 +120,7 @@ def list_forecasts(budget_id, project_id, show_id):
 
 
 @forecast.command("create")
-@click.option("--budget", "budget_id", default=None, help="Budget UUID or month name (YYYY-MM); defaults to current month, auto-created if needed")
+@click.argument("budget_id", default=None, required=False)
 @click.option("--description", default=None)
 @click.option("--value", required=True, type=float)
 @click.option("--category", "category_id", default=None, help="Category UUID or name")
@@ -184,12 +184,14 @@ def create_forecast(budget_id, description, value, category_id, tags, recurrent,
                 # Calculate theoretical start (month where installment 1 would have been)
                 theoretical_start = recurrence_service._month_offset(budget_obj.name, -(first_inst - 1))
 
-                # Create recurrence referencing the original forecast
+                # Create recurrence with template values
                 rec = await recurrence_service.create_recurrence(db, RecurrenceCreate(
                     start=theoretical_start,
                     installments=installments,
                     base_description=description,
-                    original_forecast_id=first_forecast.id,
+                    value=value,
+                    category_id=cat,
+                    tags=tag_list,
                     project_id=budget_obj.project_id,
                 ))
 
@@ -239,7 +241,9 @@ def create_forecast(budget_id, description, value, category_id, tags, recurrent,
                     start=budget_obj.name,
                     end=recurrence_end,
                     base_description=description,
-                    original_forecast_id=first_forecast.id,
+                    value=value,
+                    category_id=cat,
+                    tags=tag_list,
                     project_id=budget_obj.project_id,
                 ))
 
@@ -294,8 +298,8 @@ def create_forecast(budget_id, description, value, category_id, tags, recurrent,
 @click.option("--tags", default=None)
 @click.option("--recurrent", is_flag=True, default=False, help="Turn into a recurrent forecast")
 @click.option("--recurrence-end", default=None, help="Last month for recurrence (YYYY-MM)")
-@click.option("--budget", "budget_id", default=None, help="Budget UUID or month name; defaults to current month")
-@click.option("--project", "project_id", default=None, help="Project UUID or name (required when --budget is a month name)")
+@click.argument("budget_id", default=None, required=False)
+@click.option("--project", "project_id", default=None, help="Project UUID or name")
 def edit_forecast(counter, record_id, description, value, category_id, tags, recurrent, recurrence_end, budget_id, project_id):
     """Edit a forecast. Specify by list counter (default) or --id."""
     async def _run():
@@ -366,7 +370,9 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, rec
                     start=budget_obj.name,
                     end=recurrence_end,
                     base_description=f.description,
-                    original_forecast_id=f.id,
+                    value=Decimal(str(f.value)),
+                    category_id=f.category_id,
+                    tags=f.tags or [],
                     project_id=budget_obj.project_id,
                 ))
 
@@ -404,8 +410,8 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, rec
 
 @forecast.command("delete")
 @click.argument("forecast_id")
-@click.option("--budget", "budget_id", default=None, help="Budget UUID or month name; defaults to current month")
-@click.option("--project", "project_id", default=None, help="Project UUID or name (required when --budget is a month name)")
+@click.argument("budget_id", default=None, required=False)
+@click.option("--project", "project_id", default=None, help="Project UUID or name")
 @click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
 def delete_forecast(forecast_id, budget_id, project_id, yes):
     """Delete a forecast. FORECAST_ID can be a UUID or list counter (#)."""

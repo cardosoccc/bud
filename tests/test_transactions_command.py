@@ -205,7 +205,7 @@ def test_list_empty(runner, cli_db):
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)), \
          patch("bud.commands.utils.get_active_month", return_value="2025-01"):
-        result = runner.invoke(transaction, ["list", "--month", "2025-01"])
+        result = runner.invoke(transaction, ["list", "2025-01"])
 
     assert result.exit_code == 0
     assert "no transactions found." in result.output
@@ -219,7 +219,7 @@ def test_list_shows_transaction_descriptions(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(transaction, ["list", "--month", "2025-01"])
+        result = runner.invoke(transaction, ["list", "2025-01"])
 
     assert result.exit_code == 0
     assert "Groceries" in result.output
@@ -233,7 +233,7 @@ def test_list_shows_table_headers(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(transaction, ["list", "--month", "2025-01"])
+        result = runner.invoke(transaction, ["list", "2025-01"])
 
     assert result.exit_code == 0
     assert "#" in result.output
@@ -250,7 +250,7 @@ def test_list_does_not_show_uuid_by_default(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(transaction, ["list", "--month", "2025-01"])
+        result = runner.invoke(transaction, ["list", "2025-01"])
 
     assert result.exit_code == 0
     assert str(tid) not in result.output
@@ -263,7 +263,7 @@ def test_list_shows_uuid_with_show_id_flag(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(transaction, ["list", "--month", "2025-01", "--show-id"])
+        result = runner.invoke(transaction, ["list", "2025-01", "--show-id"])
 
     assert result.exit_code == 0
     assert "id" in result.output
@@ -277,7 +277,7 @@ def test_list_shows_account_name(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(transaction, ["list", "--month", "2025-01"])
+        result = runner.invoke(transaction, ["list", "2025-01"])
 
     assert result.exit_code == 0
     assert "MyBank" in result.output
@@ -290,7 +290,7 @@ def test_list_shows_transaction_value(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(transaction, ["list", "--month", "2025-01"])
+        result = runner.invoke(transaction, ["list", "2025-01"])
 
     assert result.exit_code == 0
     assert "99.99" in result.output
@@ -303,7 +303,7 @@ def test_list_by_project_name(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
         result = runner.invoke(
-            transaction, ["list", "--month", "2025-01", "--project", "NamedProject"]
+            transaction, ["list", "2025-01", "--project", "NamedProject"]
         )
 
     assert result.exit_code == 0
@@ -317,7 +317,7 @@ def test_list_by_project_uuid(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
         result = runner.invoke(
-            transaction, ["list", "--month", "2025-01", "--project", str(pid)]
+            transaction, ["list", "2025-01", "--project", str(pid)]
         )
 
     assert result.exit_code == 0
@@ -327,7 +327,7 @@ def test_list_by_project_uuid(runner, cli_db):
 def test_list_no_project_shows_error(runner, cli_db):
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=None):
-        result = runner.invoke(transaction, ["list", "--month", "2025-01"])
+        result = runner.invoke(transaction, ["list", "2025-01"])
 
     assert result.exit_code == 0
     assert "error" in result.stderr
@@ -342,7 +342,7 @@ def test_list_filters_by_month(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(transaction, ["list", "--month", "2025-01"])
+        result = runner.invoke(transaction, ["list", "2025-01"])
 
     assert result.exit_code == 0
     assert "JanTx" in result.output
@@ -359,7 +359,7 @@ def test_list_only_shows_project_transactions(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
         result = runner.invoke(
-            transaction, ["list", "--month", "2025-01", "--project", str(pid1)]
+            transaction, ["list", "2025-01", "--project", str(pid1)]
         )
 
     assert result.exit_code == 0
@@ -1119,7 +1119,7 @@ def test_delete_by_counter_deletes_correct_transaction(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(transaction, ["delete", "1", "--month", "2025-01", "--yes"])
+        result = runner.invoke(transaction, ["delete", "1", "2025-01", "--yes"])
 
     assert result.exit_code == 0
     assert "transaction deleted." in result.output
@@ -1136,7 +1136,7 @@ def test_delete_by_counter_confirmation_shows_counter_and_id(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(transaction, ["delete", "1", "--month", "2025-01"], input="n\n")
+        result = runner.invoke(transaction, ["delete", "1", "2025-01"], input="n\n")
 
     assert "#1" in result.output
     assert str(tid) in result.output
@@ -1149,7 +1149,7 @@ def test_delete_by_counter_out_of_range(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(transaction, ["delete", "99", "--month", "2025-01", "--yes"])
+        result = runner.invoke(transaction, ["delete", "99", "2025-01", "--yes"])
 
     assert result.exit_code == 0
     assert "not found" in result.stderr
@@ -1162,7 +1162,7 @@ def test_list_shows_counter_column(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(transaction, ["list", "--month", "2025-01"])
+        result = runner.invoke(transaction, ["list", "2025-01"])
 
     assert result.exit_code == 0
     assert "1" in result.output  # counter value
@@ -1179,7 +1179,7 @@ def test_txn_alias_creates_transaction(runner, cli_db):
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
         result = runner.invoke(cli, [
-            "txn", "create",
+            "t", "create",
             "--value", "-10.00",
             "--description", "ViaAlias",
             "--account", str(aid),
@@ -1198,7 +1198,7 @@ def test_txn_alias_lists_transactions(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(cli, ["txn", "list", "--month", "2025-01"])
+        result = runner.invoke(cli, ["t", "list", "2025-01"])
 
     assert result.exit_code == 0
     assert "AliasTx" in result.output
@@ -1210,7 +1210,7 @@ def test_txn_alias_shows_transaction(runner, cli_db):
     tid, _ = asyncio.run(_seed_transaction(cli_db, pid, aid, description="AliasShow"))
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(cli, ["txn", "show", str(tid)])
+        result = runner.invoke(cli, ["t", "show", str(tid)])
 
     assert result.exit_code == 0
     assert "AliasShow" in result.output
@@ -1227,7 +1227,7 @@ def test_txns_shortcut_lists_transactions(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(cli, ["txns", "--month", "2025-01"])
+        result = runner.invoke(cli, ["tt", "2025-01"])
 
     assert result.exit_code == 0
     assert "ShortcutTx" in result.output
@@ -1238,7 +1238,7 @@ def test_txns_shortcut_empty(runner, cli_db):
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(cli, ["txns", "--month", "2025-01"])
+        result = runner.invoke(cli, ["tt", "2025-01"])
 
     assert result.exit_code == 0
     assert "no transactions found." in result.output
@@ -1250,7 +1250,7 @@ def test_txns_shortcut_with_project_option(runner, cli_db):
     asyncio.run(_seed_transaction(cli_db, pid, aid, description="SpecificTx", txn_date=date(2025, 1, 10)))
 
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(cli, ["txns", "--month", "2025-01", "--project", str(pid)])
+        result = runner.invoke(cli, ["tt", "2025-01", "--project", str(pid)])
 
     assert result.exit_code == 0
     assert "SpecificTx" in result.output
@@ -1264,7 +1264,7 @@ def test_txns_shortcut_uses_default_month(runner, cli_db):
     with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)), \
          patch("bud.commands.utils.get_active_month", return_value="2025-05"):
-        result = runner.invoke(cli, ["txns"])
+        result = runner.invoke(cli, ["tt"])
 
     assert result.exit_code == 0
     assert "DefaultMonthTx" in result.output

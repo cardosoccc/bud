@@ -138,7 +138,7 @@ A recurrence is a dedicated record that tracks a repeating forecast across month
 - Use `--current-installment M` to start from installment M instead of 1 (e.g. when entering a purchase already partially paid). Only installments M through N are created.
 
 **How recurrences are stored:**
-- A `recurrences` table holds metadata: start month, optional end month, optional installment count, the base description, and a reference to the original forecast.
+- A `recurrences` table holds metadata: start month, optional end month, optional installment count, the base description, and template values (value, category, tags) used when creating forecasts in new budgets.
 - Each forecast linked to a recurrence has a `recurrence_id` foreign key and an optional `installment` number.
 - The installment suffix (e.g. `(3/10)`) is assembled dynamically at display time — it is not stored in the forecast's description field.
 
@@ -702,7 +702,8 @@ budgets
 recurrences
   id (UUID PK), start (YYYY-MM), end (YYYY-MM, nullable),
   installments (int, nullable), base_description (nullable),
-  original_forecast_id (FK → forecasts CASCADE),
+  value, tags (JSON),
+  category_id (FK → categories SET NULL),
   project_id (FK → projects CASCADE), created_at
 
 forecasts

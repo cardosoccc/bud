@@ -1,12 +1,12 @@
 import uuid
 from typing import List, Optional
 
-from sqlalchemy import select, or_, and_
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from bud.models.recurrence import Recurrence
-from bud.schemas.recurrence import RecurrenceCreate
+from bud.schemas.recurrence import RecurrenceCreate, RecurrenceUpdate
 
 
 def _month_offset(start: str, n: int) -> str:
@@ -40,7 +40,9 @@ async def create_recurrence(db: AsyncSession, data: RecurrenceCreate) -> Recurre
         end=data.end,
         installments=data.installments,
         base_description=data.base_description,
-        original_forecast_id=data.original_forecast_id,
+        value=data.value,
+        category_id=data.category_id,
+        tags=data.tags,
         project_id=data.project_id,
     )
     db.add(recurrence)
@@ -62,11 +64,11 @@ async def get_recurrences_for_month(
     """
     result = await db.execute(
         select(Recurrence)
+        .options(selectinload(Recurrence.category))
         .where(
             Recurrence.project_id == project_id,
             Recurrence.start <= month,
         )
-        .options(selectinload(Recurrence.original_forecast))
     )
     recurrences = list(result.scalars().all())
 
@@ -85,3 +87,76 @@ async def get_recurrences_for_month(
 def get_installment_number(recurrence: Recurrence, month: str) -> int:
     """Calculate the installment number (1-based) for a given month."""
     return _months_between(recurrence.start, month) + 1
+
+
+async def list_recurrences(
+    db: AsyncSession, project_id: uuid.UUID
+) -> List[Recurrence]:
+    """Return all recurrences for a project, ordered by start."""
+    result = await db.execute(
+        select(Recurrence)
+        .options(selectinload(Recurrence.category))
+        .where(Recurrence.project_id == project_id)
+        .order_by(Recurrence.start)
+    )
+    return list(result.scalars().all())
+
+
+async def update_recurrence(
+    db: AsyncSession, recurrence_id: uuid.UUID, data: RecurrenceUpdate
+) -> Optional[Recurrence]:
+    rec = await get_recurrence(db, recurrence_id)
+    if not rec:
+        return None
+    for field, val in data.model_dump(exclude_unset=True).items():
+        setattr(rec, field, val)
+    await db.commit()
+    await db.refresh(rec)
+    return rec
+
+
+async def delete_recurrence(
+    db: AsyncSession, recurrence_id: uuid.UUID, cascade: bool = False
+) -> bool:
+    from bud.models.forecast import Forecast
+
+    rec = await get_recurrence(db, recurrence_id)
+    if not rec:
+        return False
+
+    # Load linked forecasts
+    result = await db.execute(
+        select(Forecast).where(Forecast.recurrence_id == recurrence_id)
+    )
+    forecasts = list(result.scalars().all())
+
+    if cascade:
+        for f in forecasts:
+            await db.delete(f)
+    else:
+        for f in forecasts:
+            f.recurrence_id = None
+
+    await db.delete(rec)
+    await db.commit()
+    return True
+
+
+async def propagate_to_forecasts(db: AsyncSession, rec: Recurrence) -> int:
+    """Update all linked forecasts to match the recurrence's template values."""
+    from bud.models.forecast import Forecast
+
+    result = await db.execute(
+        select(Forecast).where(Forecast.recurrence_id == rec.id)
+    )
+    forecasts = list(result.scalars().all())
+    count = 0
+    for f in forecasts:
+        if rec.base_description is not None:
+            f.description = rec.base_description
+        f.value = rec.value
+        f.category_id = rec.category_id
+        f.tags = rec.tags or []
+        count += 1
+    await db.commit()
+    return count

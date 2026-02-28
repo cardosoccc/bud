@@ -65,6 +65,7 @@ def migrate():
             await conn.run_sync(Base.metadata.create_all)
             # Add new columns to existing tables
             await conn.run_sync(_migrate_forecasts_schema)
+            await conn.run_sync(_migrate_recurrences_schema)
 
         # Data migration: convert old is_recurrent forecasts to recurrence records
         async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -125,82 +126,229 @@ def _migrate_forecasts_schema(conn):
         conn.execute(text("ALTER TABLE forecasts_new RENAME TO forecasts"))
 
 
+def _migrate_recurrences_schema(conn):
+    """Migrate recurrences table: add value/category_id/tags, populate from original_forecast, drop original_forecast_id."""
+    from sqlalchemy import text
+
+    cursor = conn.execute(text("PRAGMA table_info(recurrences)"))
+    columns = {row[1] for row in cursor.fetchall()}
+
+    if not columns:
+        return
+
+    if "value" not in columns:
+        conn.execute(text("ALTER TABLE recurrences ADD COLUMN value NUMERIC(15, 2) DEFAULT 0 NOT NULL"))
+
+    if "category_id" not in columns:
+        conn.execute(text("ALTER TABLE recurrences ADD COLUMN category_id CHAR(32) REFERENCES categories(id) ON DELETE SET NULL"))
+
+    if "tags" not in columns:
+        conn.execute(text("ALTER TABLE recurrences ADD COLUMN tags JSON DEFAULT '[]' NOT NULL"))
+
+    # Populate new columns from original_forecast if the FK still exists
+    if "original_forecast_id" in columns:
+        conn.execute(text("""
+            UPDATE recurrences SET
+                value = COALESCE((SELECT f.value FROM forecasts f WHERE f.id = recurrences.original_forecast_id), 0),
+                category_id = (SELECT f.category_id FROM forecasts f WHERE f.id = recurrences.original_forecast_id),
+                tags = COALESCE((SELECT f.tags FROM forecasts f WHERE f.id = recurrences.original_forecast_id), '[]')
+            WHERE value = 0
+        """))
+
+        # Recreate table without original_forecast_id
+        keep_cols = "id, start, \"end\", installments, base_description, value, category_id, tags, project_id, created_at"
+
+        conn.execute(text("""
+            CREATE TABLE recurrences_new (
+                id CHAR(32) NOT NULL PRIMARY KEY,
+                start VARCHAR(7) NOT NULL,
+                "end" VARCHAR(7),
+                installments INTEGER,
+                base_description VARCHAR(500),
+                value NUMERIC(15, 2) NOT NULL DEFAULT 0,
+                category_id CHAR(32) REFERENCES categories(id) ON DELETE SET NULL,
+                tags JSON NOT NULL DEFAULT '[]',
+                project_id CHAR(32) NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL
+            )
+        """))
+        conn.execute(text(f"INSERT INTO recurrences_new ({keep_cols}) SELECT {keep_cols} FROM recurrences"))
+        conn.execute(text("DROP TABLE recurrences"))
+        conn.execute(text("ALTER TABLE recurrences_new RENAME TO recurrences"))
+
+
 async def _migrate_recurrent_forecasts_data(db):
     """Convert old is_recurrent=1 forecasts (without a recurrence_id) into
-    proper recurrence records.
+    proper recurrence records, then deduplicate recurrences.
 
-    For each such forecast, creates a recurrence with start = budget month
-    and end = recurrent_end (if set), then links the forecast to it.
-    Forecasts sharing the same description+value+budget are grouped so that
-    each unique recurrent forecast gets one recurrence.
+    Groups forecasts by description+value+project_id so that identical
+    recurring forecasts across months share a single recurrence record.
     """
-    from sqlalchemy import text
+    from sqlalchemy import text, select
     from bud.models.recurrence import Recurrence
     from bud.models.forecast import Forecast
     from bud.models.budget import Budget
+    from decimal import Decimal
     import uuid as uuid_mod
 
     # Check if the old is_recurrent column still exists
     result = await db.execute(text("PRAGMA table_info(forecasts)"))
     columns = {row[1] for row in result.fetchall()}
-    if "is_recurrent" not in columns:
-        return 0
-
-    # Find old recurrent forecasts that haven't been migrated yet
-    rows = await db.execute(
-        text("SELECT id, budget_id, recurrent_start, recurrent_end FROM forecasts WHERE is_recurrent = 1 AND recurrence_id IS NULL")
-    )
-    old_recurrents = rows.fetchall()
-    if not old_recurrents:
-        return 0
-
-    from sqlalchemy import select
 
     migrated = 0
-    for row in old_recurrents:
-        forecast_id_str, budget_id_str, recurrent_start, recurrent_end = row
-        forecast_id = uuid_mod.UUID(forecast_id_str)
-        budget_id = uuid_mod.UUID(budget_id_str)
 
-        # Get the budget to determine the start month
-        budget_result = await db.execute(select(Budget).where(Budget.id == budget_id))
-        budget_obj = budget_result.scalar_one_or_none()
-        if not budget_obj:
-            continue
-
-        # Convert recurrent_end date to YYYY-MM string if present
-        end_month = None
-        if recurrent_end:
-            from datetime import date
-            if isinstance(recurrent_end, str):
-                end_month = recurrent_end[:7]
-            elif isinstance(recurrent_end, date):
-                end_month = recurrent_end.strftime("%Y-%m")
-
-        # Get the forecast to read its description for base_description
-        forecast_result = await db.execute(select(Forecast).where(Forecast.id == forecast_id))
-        forecast_obj = forecast_result.scalar_one_or_none()
-        if not forecast_obj:
-            continue
-
-        # Create a recurrence record
-        rec = Recurrence(
-            id=uuid_mod.uuid4(),
-            start=budget_obj.name,
-            end=end_month,
-            base_description=forecast_obj.description,
-            original_forecast_id=forecast_id,
-            project_id=budget_obj.project_id,
+    if "is_recurrent" in columns:
+        # Find old recurrent forecasts that haven't been migrated yet
+        rows = await db.execute(
+            text("SELECT id, budget_id, recurrent_start, recurrent_end FROM forecasts WHERE is_recurrent = 1 AND recurrence_id IS NULL")
         )
-        db.add(rec)
-        await db.flush()
+        old_recurrents = rows.fetchall()
 
-        # Link the forecast to the recurrence
-        forecast_obj.recurrence_id = rec.id
-        migrated += 1
+        # Group by description+value+project to reuse recurrences
+        rec_cache = {}  # (description, value_str, project_id) -> recurrence
 
-    await db.commit()
-    return migrated
+        for row in old_recurrents:
+            forecast_id_str, budget_id_str, recurrent_start, recurrent_end = row
+            forecast_id = uuid_mod.UUID(forecast_id_str)
+            budget_id = uuid_mod.UUID(budget_id_str)
+
+            budget_result = await db.execute(select(Budget).where(Budget.id == budget_id))
+            budget_obj = budget_result.scalar_one_or_none()
+            if not budget_obj:
+                continue
+
+            end_month = None
+            if recurrent_end:
+                from datetime import date
+                if isinstance(recurrent_end, str):
+                    end_month = recurrent_end[:7]
+                elif isinstance(recurrent_end, date):
+                    end_month = recurrent_end.strftime("%Y-%m")
+
+            forecast_result = await db.execute(select(Forecast).where(Forecast.id == forecast_id))
+            forecast_obj = forecast_result.scalar_one_or_none()
+            if not forecast_obj:
+                continue
+
+            key = (forecast_obj.description, str(forecast_obj.value), str(budget_obj.project_id))
+
+            if key in rec_cache:
+                rec = rec_cache[key]
+                # Update start to earliest month
+                if budget_obj.name < rec.start:
+                    rec.start = budget_obj.name
+            else:
+                rec = Recurrence(
+                    id=uuid_mod.uuid4(),
+                    start=budget_obj.name,
+                    end=end_month,
+                    base_description=forecast_obj.description,
+                    value=Decimal(str(forecast_obj.value)),
+                    category_id=forecast_obj.category_id,
+                    tags=forecast_obj.tags or [],
+                    project_id=budget_obj.project_id,
+                )
+                db.add(rec)
+                await db.flush()
+                rec_cache[key] = rec
+
+            forecast_obj.recurrence_id = rec.id
+            migrated += 1
+
+        await db.commit()
+
+    # Deduplicate existing recurrences: group by base_description+value+project_id,
+    # keep the one with the earliest start, re-link all forecasts to it
+    deduped = await _deduplicate_recurrences(db)
+
+    # Re-link orphaned forecasts that lost their recurrence_id (e.g. from
+    # a previous broken migration where ondelete=SET NULL fired)
+    relinked = await _relink_orphaned_forecasts(db)
+
+    return migrated + deduped + relinked
+
+
+async def _relink_orphaned_forecasts(db):
+    """Re-link forecasts that have recurrence_id=NULL but match a recurrence
+    by description+value+project_id. This fixes data left broken by previous
+    migrations where ondelete=SET NULL cascade wiped recurrence_id values.
+    """
+    from sqlalchemy import text
+
+    result = await db.execute(text("""
+        UPDATE forecasts SET recurrence_id = (
+            SELECT r.id FROM recurrences r
+            JOIN budgets b ON b.id = forecasts.budget_id
+            WHERE r.base_description = forecasts.description
+              AND CAST(r.value AS TEXT) = CAST(forecasts.value AS TEXT)
+              AND r.project_id = b.project_id
+            LIMIT 1
+        )
+        WHERE recurrence_id IS NULL
+          AND EXISTS (
+            SELECT 1 FROM recurrences r
+            JOIN budgets b ON b.id = forecasts.budget_id
+            WHERE r.base_description = forecasts.description
+              AND CAST(r.value AS TEXT) = CAST(forecasts.value AS TEXT)
+              AND r.project_id = b.project_id
+          )
+    """))
+    relinked = result.rowcount
+    if relinked:
+        await db.commit()
+    return relinked
+
+
+async def _deduplicate_recurrences(db):
+    """Merge duplicate recurrences (same base_description+value+project_id).
+
+    Keeps the recurrence with the earliest start, re-links forecasts from
+    duplicates to the keeper, then deletes the duplicates.
+
+    Uses raw SQL to avoid ondelete="SET NULL" cascade on the FK.
+    """
+    from sqlalchemy import text
+
+    # Get all recurrences ordered by start
+    result = await db.execute(text(
+        "SELECT id, base_description, value, project_id, start FROM recurrences ORDER BY start"
+    ))
+    all_recs = result.fetchall()
+
+    # Group by (base_description, value_str, project_id)
+    groups = {}
+    for row in all_recs:
+        rec_id, desc, value, project_id, start = row
+        key = (desc, str(value), str(project_id))
+        groups.setdefault(key, []).append(rec_id)
+
+    deduped = 0
+    for key, rec_ids in groups.items():
+        if len(rec_ids) <= 1:
+            continue
+
+        keeper_id = rec_ids[0]
+        dup_ids = rec_ids[1:]
+
+        for dup_id in dup_ids:
+            # Re-link forecasts using raw SQL (bypasses FK cascade)
+            result = await db.execute(
+                text("UPDATE forecasts SET recurrence_id = :keeper WHERE recurrence_id = :dup"),
+                {"keeper": keeper_id, "dup": dup_id},
+            )
+            deduped += result.rowcount
+
+        # Delete all duplicates at once using raw SQL (bypasses FK cascade)
+        placeholders = ", ".join(f":id{i}" for i in range(len(dup_ids)))
+        params = {f"id{i}": did for i, did in enumerate(dup_ids)}
+        await db.execute(
+            text(f"DELETE FROM recurrences WHERE id IN ({placeholders})"),
+            params,
+        )
+
+    if deduped:
+        await db.commit()
+    return deduped
 
 
 @db.command("destroy")

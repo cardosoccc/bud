@@ -688,7 +688,7 @@ def test_acc_alias_creates_account(runner, cli_db):
 
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(cli, ["acc", "create", "ViaAlias"])
+        result = runner.invoke(cli, ["a", "create", "ViaAlias"])
 
     assert result.exit_code == 0
     assert "created account: ViaAlias" in result.output
@@ -700,7 +700,7 @@ def test_acc_alias_lists_accounts(runner, cli_db):
 
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(cli, ["acc", "list"])
+        result = runner.invoke(cli, ["a", "list"])
 
     assert result.exit_code == 0
     assert "AliasAccount" in result.output
@@ -716,7 +716,7 @@ def test_accs_shortcut_lists_accounts(runner, cli_db):
 
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(cli, ["accs"])
+        result = runner.invoke(cli, ["aa"])
 
     assert result.exit_code == 0
     assert "ShortcutAccount" in result.output
@@ -727,7 +727,7 @@ def test_accs_shortcut_empty(runner, cli_db):
 
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
-        result = runner.invoke(cli, ["accs"])
+        result = runner.invoke(cli, ["aa"])
 
     assert result.exit_code == 0
     assert "no accounts found." in result.output
@@ -738,7 +738,7 @@ def test_accs_shortcut_with_project_option(runner, cli_db):
     asyncio.run(_seed_account(cli_db, pid, "SpecificAccount"))
 
     with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)):
-        result = runner.invoke(cli, ["accs", "--project", str(pid)])
+        result = runner.invoke(cli, ["aa", "--project", str(pid)])
 
     assert result.exit_code == 0
     assert "SpecificAccount" in result.output
