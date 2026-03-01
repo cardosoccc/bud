@@ -337,8 +337,15 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, rec
             if category_id:
                 cat = await resolve_category_id(db, category_id)
                 if not cat:
-                    click.echo(f"category not found: {category_id}", err=True)
-                    return
+                    if is_uuid(category_id):
+                        click.echo(f"category not found: {category_id}", err=True)
+                        return
+                    if click.confirm(f"category '{category_id}' not found. create it?", default=False):
+                        new_cat = await category_service.create_category(db, CategoryCreate(name=category_id))
+                        cat = new_cat.id
+                        click.echo(f"created category: {new_cat.name}")
+                    else:
+                        return
 
             f = await forecast_service.update_forecast(db, fid, ForecastUpdate(
                 description=description,

@@ -5,7 +5,14 @@ from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
 from bud.commands.utils import resolve_project_id, resolve_category_id, is_uuid
+from bud.schemas.category import CategoryCreate
+from bud.services import categories as category_service
 from bud.services import recurrences as recurrence_service
+
+
+def _sort_key_unnamed_last(description):
+    """Sort key: named items first (insertion order), unnamed last."""
+    return 0 if description else 1
 
 
 @click.group()
@@ -29,6 +36,8 @@ async def _resolve_items(db, project_id, month, show_all):
         m = month if month else require_month()
         items = await recurrence_service.get_recurrences_for_month(db, pid, m)
 
+    if items:
+        items.sort(key=lambda r: _sort_key_unnamed_last(r.base_description))
     return pid, items
 
 
@@ -111,8 +120,15 @@ def edit_recurrence(counter, record_id, description, value, category_id, tags,
             if category_id:
                 cat = await resolve_category_id(db, category_id)
                 if not cat:
-                    click.echo(f"category not found: {category_id}", err=True)
-                    return
+                    if is_uuid(category_id):
+                        click.echo(f"category not found: {category_id}", err=True)
+                        return
+                    if click.confirm(f"category '{category_id}' not found. create it?", default=False):
+                        new_cat = await category_service.create_category(db, CategoryCreate(name=category_id))
+                        cat = new_cat.id
+                        click.echo(f"created category: {new_cat.name}")
+                    else:
+                        return
 
             tag_list = [t.strip() for t in tags.split(",")] if tags else None
 

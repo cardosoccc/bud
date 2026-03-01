@@ -108,9 +108,11 @@ def report(budget_id, project_id):
                         desc = f"{desc} ({f.installment}/{f.total_installments})".strip()
                     return desc
 
+                sorted_forecasts = sorted(r.forecasts, key=lambda f: 0 if f.description else 1)
+
                 rows = [
                     [_display_desc(f), f.category_name or "", ", ".join(f.tags) if f.tags else "", f.forecast_value, f.actual_value, f.difference]
-                    for f in r.forecasts
+                    for f in sorted_forecasts
                 ]
                 total_forecasted = sum(f.forecast_value for f in r.forecasts)
                 total_current = sum(f.actual_value for f in r.forecasts)
