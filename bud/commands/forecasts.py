@@ -68,8 +68,8 @@ async def _resolve_or_create_budget_id(db, budget_id, project_id):
 
 @forecast.command("list")
 @click.argument("budget_id", default=None, required=False)
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
-@click.option("--show-id", is_flag=True, default=False, help="Show forecast UUIDs")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
+@click.option("--show-id", "-s", is_flag=True, default=False, help="Show forecast UUIDs")
 def list_forecasts(budget_id, project_id, show_id):
     """List all forecasts for a budget. Defaults to the current month's budget."""
     async def _run():
@@ -121,15 +121,15 @@ def list_forecasts(budget_id, project_id, show_id):
 
 @forecast.command("create")
 @click.argument("budget_id", default=None, required=False)
-@click.option("--description", default=None)
-@click.option("--value", required=True, type=float)
-@click.option("--category", "category_id", default=None, help="Category UUID or name")
-@click.option("--tags", default=None, help="Comma-separated tags")
-@click.option("--recurrent", is_flag=True, default=False, help="Mark as recurrent")
-@click.option("--recurrence-end", default=None, help="Last month for recurrence (YYYY-MM)")
-@click.option("--installments", type=int, default=None, help="Number of installments")
+@click.option("--description", "-d", default=None)
+@click.option("--value", "-v", required=True, type=float)
+@click.option("--category", "-c", "category_id", default=None, help="Category UUID or name")
+@click.option("--tags", "-t", default=None, help="Comma-separated tags")
+@click.option("--recurrent", "-r", is_flag=True, default=False, help="Mark as recurrent")
+@click.option("--recurrence-end", "-e", default=None, help="Last month for recurrence (YYYY-MM)")
+@click.option("--installments", "-i", type=int, default=None, help="Number of installments")
 @click.option("--current-installment", type=int, default=None, help="Current installment number (e.g. 5 means this is the 5th of N)")
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 def create_forecast(budget_id, description, value, category_id, tags, recurrent, recurrence_end, installments, current_installment, project_id):
     """Create a forecast. Budget defaults to the current month and is auto-created if missing.
 
@@ -292,14 +292,14 @@ def create_forecast(budget_id, description, value, category_id, tags, recurrent,
 @forecast.command("edit")
 @click.argument("counter", required=False, type=int, default=None)
 @click.option("--id", "record_id", default=None, help="Forecast UUID")
-@click.option("--description", default=None)
-@click.option("--value", type=float, default=None)
-@click.option("--category", "category_id", default=None, help="Category UUID or name")
-@click.option("--tags", default=None)
-@click.option("--recurrent", is_flag=True, default=False, help="Turn into a recurrent forecast")
-@click.option("--recurrence-end", default=None, help="Last month for recurrence (YYYY-MM)")
+@click.option("--description", "-d", default=None)
+@click.option("--value", "-v", type=float, default=None)
+@click.option("--category", "-c", "category_id", default=None, help="Category UUID or name")
+@click.option("--tags", "-t", default=None)
+@click.option("--recurrent", "-r", is_flag=True, default=False, help="Turn into a recurrent forecast")
+@click.option("--recurrence-end", "-e", default=None, help="Last month for recurrence (YYYY-MM)")
 @click.argument("budget_id", default=None, required=False)
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 def edit_forecast(counter, record_id, description, value, category_id, tags, recurrent, recurrence_end, budget_id, project_id):
     """Edit a forecast. Specify by list counter (default) or --id."""
     async def _run():
@@ -411,7 +411,7 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, rec
 @forecast.command("delete")
 @click.argument("forecast_id")
 @click.argument("budget_id", default=None, required=False)
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 @click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
 def delete_forecast(forecast_id, budget_id, project_id, yes):
     """Delete a forecast. FORECAST_ID can be a UUID or list counter (#)."""

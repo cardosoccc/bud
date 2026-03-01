@@ -17,7 +17,7 @@ def project():
 
 
 @project.command("list")
-@click.option("--show-id", is_flag=True, default=False, help="Show project UUIDs")
+@click.option("--show-id", "-s", is_flag=True, default=False, help="Show project UUIDs")
 def list_projects(show_id):
     """List all projects."""
     async def _run():
@@ -38,7 +38,7 @@ def list_projects(show_id):
 
 
 @project.command("create")
-@click.option("--name", required=True, help="Project name")
+@click.option("--name", "-n", required=True, help="Project name")
 def create_project(name):
     """Create a new project."""
     async def _run():
@@ -52,7 +52,7 @@ def create_project(name):
 @project.command("edit")
 @click.argument("counter", required=False, type=int, default=None)
 @click.option("--id", "record_id", default=None, help="Project UUID")
-@click.option("--name", default=None)
+@click.option("--name", "-n", default=None)
 def edit_project(counter, record_id, name):
     """Edit a project. Specify by list counter (default) or --id."""
     async def _run():

@@ -49,7 +49,7 @@ def _build_table(headers, rows, widths, numeric):
 
 @click.command()
 @click.argument("budget_id", required=False, default=None)
-@click.option("--project", "project_id", default=None, help="Project name or ID.")
+@click.option("--project", "-p", "project_id", default=None, help="Project name or ID.")
 def report(budget_id, project_id):
     """Show a budget report.
 

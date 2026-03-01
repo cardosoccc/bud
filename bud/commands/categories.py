@@ -16,7 +16,7 @@ def category():
 
 
 @category.command("list")
-@click.option("--show-id", is_flag=True, default=False, help="Show category UUIDs")
+@click.option("--show-id", "-s", is_flag=True, default=False, help="Show category UUIDs")
 def list_categories(show_id):
     """List all categories."""
     async def _run():
@@ -51,7 +51,7 @@ def create_category(name):
 @category.command("edit")
 @click.argument("counter", required=False, type=int, default=None)
 @click.option("--id", "record_id", default=None, help="Category UUID")
-@click.option("--name", required=True)
+@click.option("--name", "-n", required=True)
 def edit_category(counter, record_id, name):
     """Edit a category. Specify by list counter (default) or --id."""
     async def _run():

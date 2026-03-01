@@ -55,7 +55,7 @@ def _handle_auth_error(err) -> None:
 
 
 @click.command("push")
-@click.option("--force", is_flag=True, help="Push even if remote has a newer version.")
+@click.option("--force", "-f", is_flag=True, help="Push even if remote has a newer version.")
 def push(force: bool) -> None:
     """Push the local database to cloud storage."""
     from bud.services.storage import CloudAuthError, get_provider
@@ -99,7 +99,7 @@ def push(force: bool) -> None:
 
 
 @click.command("pull")
-@click.option("--force", is_flag=True, help="Pull even if local has a newer version.")
+@click.option("--force", "-f", is_flag=True, help="Pull even if local has a newer version.")
 def pull(force: bool) -> None:
     """Pull the database from cloud storage."""
     from bud.services.storage import CloudAuthError, get_provider

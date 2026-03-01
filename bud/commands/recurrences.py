@@ -14,14 +14,6 @@ def recurrence():
     pass
 
 
-def _recurrence_type_label(r):
-    if r.installments:
-        return f"{r.installments} installments"
-    if r.end:
-        return f"until {r.end}"
-    return "open"
-
-
 async def _resolve_items(db, project_id, month, show_all):
     """Return the list of recurrences based on --all flag or month scope."""
     from bud.commands.utils import require_month
@@ -42,9 +34,9 @@ async def _resolve_items(db, project_id, month, show_all):
 
 @recurrence.command("list")
 @click.argument("month", default=None, required=False)
-@click.option("--all", "show_all", is_flag=True, default=False, help="Show all recurrences")
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
-@click.option("--show-id", is_flag=True, default=False, help="Show recurrence UUIDs")
+@click.option("--all", "-a", "show_all", is_flag=True, default=False, help="Show all recurrences")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
+@click.option("--show-id", "-s", is_flag=True, default=False, help="Show recurrence UUIDs")
 def list_recurrences(month, show_all, project_id, show_id):
     """List recurrences. Defaults to those active in the current month."""
     async def _run():
@@ -61,19 +53,19 @@ def list_recurrences(month, show_all, project_id, show_id):
                     [i + 1, str(r.id), r.base_description or "", r.value,
                      r.category.name if r.category else "",
                      ", ".join(r.tags) if r.tags else "",
-                     r.start, _recurrence_type_label(r)]
+                     r.start, r.end or "", r.installments or ""]
                     for i, r in enumerate(items)
                 ]
-                headers = ["#", "id", "description", "value", "category", "tags", "start", "type"]
+                headers = ["#", "id", "description", "value", "category", "tags", "start", "end", "installments"]
             else:
                 rows = [
                     [i + 1, r.base_description or "", r.value,
                      r.category.name if r.category else "",
                      ", ".join(r.tags) if r.tags else "",
-                     r.start, _recurrence_type_label(r)]
+                     r.start, r.end or "", r.installments or ""]
                     for i, r in enumerate(items)
                 ]
-                headers = ["#", "description", "value", "category", "tags", "start", "type"]
+                headers = ["#", "description", "value", "category", "tags", "start", "end", "installments"]
             click.echo(tabulate(rows, headers=headers, tablefmt="presto", floatfmt=".2f"))
 
     run_async(_run())
@@ -82,17 +74,17 @@ def list_recurrences(month, show_all, project_id, show_id):
 @recurrence.command("edit")
 @click.argument("counter", required=False, type=int, default=None)
 @click.option("--id", "record_id", default=None, help="Recurrence UUID")
-@click.option("--description", default=None)
-@click.option("--value", type=float, default=None)
-@click.option("--category", "category_id", default=None, help="Category UUID or name")
-@click.option("--tags", default=None, help="Comma-separated tags")
-@click.option("--start", default=None, help="Start month (YYYY-MM)")
-@click.option("--end", default=None, help="End month (YYYY-MM)")
-@click.option("--installments", type=int, default=None)
+@click.option("--description", "-d", default=None)
+@click.option("--value", "-v", type=float, default=None)
+@click.option("--category", "-c", "category_id", default=None, help="Category UUID or name")
+@click.option("--tags", "-t", default=None, help="Comma-separated tags")
+@click.option("--start", "-s", default=None, help="Start month (YYYY-MM)")
+@click.option("--end", "-e", default=None, help="End month (YYYY-MM)")
+@click.option("--installments", "-i", type=int, default=None)
 @click.option("--propagate", is_flag=True, default=False, help="Propagate changes to linked forecasts")
 @click.argument("month", default=None, required=False)
-@click.option("--all", "show_all", is_flag=True, default=False, help="Use counter from full list")
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
+@click.option("--all", "-a", "show_all", is_flag=True, default=False, help="Use counter from full list")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 def edit_recurrence(counter, record_id, description, value, category_id, tags,
                     start, end, installments, propagate, month, show_all, project_id):
     """Edit a recurrence. Specify by list counter (default) or --id."""
@@ -159,9 +151,9 @@ def edit_recurrence(counter, record_id, description, value, category_id, tags,
 @recurrence.command("delete")
 @click.argument("recurrence_id")
 @click.argument("month", default=None, required=False)
-@click.option("--all", "show_all", is_flag=True, default=False, help="Use counter from full list")
-@click.option("--cascade", is_flag=True, default=False, help="Delete all linked forecasts too")
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
+@click.option("--all", "-a", "show_all", is_flag=True, default=False, help="Use counter from full list")
+@click.option("--cascade", "-c", is_flag=True, default=False, help="Delete all linked forecasts too")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 @click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
 def delete_recurrence(recurrence_id, month, show_all, cascade, project_id, yes):
     """Delete a recurrence. RECURRENCE_ID can be a UUID or list counter (#)."""

@@ -20,8 +20,8 @@ def transaction():
 
 @transaction.command("list")
 @click.argument("month", default=None, required=False)
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
-@click.option("--show-id", is_flag=True, default=False, help="Show transaction UUIDs")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
+@click.option("--show-id", "-s", is_flag=True, default=False, help="Show transaction UUIDs")
 def list_transactions(month, project_id, show_id):
     """List transactions for a given month."""
     async def _run():
@@ -75,12 +75,12 @@ def show_transaction(transaction_id):
 
 
 @transaction.command("create")
-@click.option("--value", required=True, type=float, help="Amount (positive = income, negative = expense)")
-@click.option("--description", required=True)
-@click.option("--date", "txn_date", default=None, help="YYYY-MM-DD (default: today)")
-@click.option("--account", "account_id", required=True, help="Account UUID or name")
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
-@click.option("--category", "category_id", default=None, help="Category UUID or name")
+@click.option("--value", "-v", required=True, type=float, help="Amount (positive = income, negative = expense)")
+@click.option("--description", "-d", required=True)
+@click.option("--date", "-t", "txn_date", default=None, help="YYYY-MM-DD (default: today)")
+@click.option("--account", "-a", "account_id", required=True, help="Account UUID or name")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
+@click.option("--category", "-c", "category_id", default=None, help="Category UUID or name")
 @click.option("--tags", default=None, help="Comma-separated tags")
 def create_transaction(value, description, txn_date, account_id, project_id, category_id, tags):
     """Create a new transaction. Use positive values for income and negative for expenses."""
@@ -132,13 +132,13 @@ def create_transaction(value, description, txn_date, account_id, project_id, cat
 @transaction.command("edit")
 @click.argument("counter", required=False, type=int, default=None)
 @click.option("--id", "record_id", default=None, help="Transaction UUID")
-@click.option("--value", type=float, default=None)
-@click.option("--description", default=None)
-@click.option("--date", "txn_date", default=None)
-@click.option("--category", "category_id", default=None, help="Category UUID or name")
+@click.option("--value", "-v", type=float, default=None)
+@click.option("--description", "-d", default=None)
+@click.option("--date", "-t", "txn_date", default=None)
+@click.option("--category", "-c", "category_id", default=None, help="Category UUID or name")
 @click.option("--tags", default=None, help="Comma-separated tags")
 @click.argument("month", default=None, required=False)
-@click.option("--project", "project_id", default=None, help="Project UUID or name (required when using counter)")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name (required when using counter)")
 def edit_transaction(counter, record_id, value, description, txn_date, category_id, tags, month, project_id):
     """Edit a transaction. Specify by list counter (default) or --id."""
     async def _run():
@@ -197,7 +197,7 @@ def edit_transaction(counter, record_id, value, description, txn_date, category_
 @transaction.command("delete")
 @click.argument("transaction_id")
 @click.argument("month", default=None, required=False)
-@click.option("--project", "project_id", default=None, help="Project UUID or name (required when TRANSACTION_ID is a counter)")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name (required when TRANSACTION_ID is a counter)")
 @click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
 def delete_transaction(transaction_id, month, project_id, yes):
     """Delete a transaction. TRANSACTION_ID can be a UUID or a list counter (#)."""

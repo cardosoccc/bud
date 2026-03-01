@@ -16,8 +16,8 @@ def account():
 
 
 @account.command("list")
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
-@click.option("--show-id", is_flag=True, default=False, help="Show account UUIDs")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
+@click.option("--show-id", "-s", is_flag=True, default=False, help="Show account UUIDs")
 def list_accounts(project_id, show_id):
     """List accounts."""
     async def _run():
@@ -44,9 +44,9 @@ def list_accounts(project_id, show_id):
 
 @account.command("create")
 @click.argument("name")
-@click.option("--type", "account_type", type=click.Choice(["credit", "debit"]), default="debit")
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
-@click.option("--initial-balance", "initial_balance", type=float, default=0, help="Initial balance (default: 0)")
+@click.option("--type", "-t", "account_type", type=click.Choice(["credit", "debit"]), default="debit")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
+@click.option("--initial-balance", "-i", "initial_balance", type=float, default=0, help="Initial balance (default: 0)")
 def create_account(name, account_type, project_id, initial_balance):
     """Create a new account."""
     async def _run():
@@ -69,11 +69,11 @@ def create_account(name, account_type, project_id, initial_balance):
 @account.command("edit")
 @click.argument("identifier", required=False, default=None)
 @click.option("--id", "record_id", default=None, help="Account UUID")
-@click.option("--name", default=None)
-@click.option("--type", "account_type", type=click.Choice(["credit", "debit"]), default=None)
-@click.option("--initial-balance", "initial_balance", type=float, default=None, help="Set initial balance")
-@click.option("--current-balance", "current_balance", type=float, default=None, help="Set current balance")
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
+@click.option("--name", "-n", default=None)
+@click.option("--type", "-t", "account_type", type=click.Choice(["credit", "debit"]), default=None)
+@click.option("--initial-balance", "-i", "initial_balance", type=float, default=None, help="Set initial balance")
+@click.option("--current-balance", "-c", "current_balance", type=float, default=None, help="Set current balance")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 def edit_account(identifier, record_id, name, account_type, initial_balance, current_balance, project_id):
     """Edit an account. Specify by list counter or name (default) or --id."""
     async def _run():
@@ -118,7 +118,7 @@ def edit_account(identifier, record_id, name, account_type, initial_balance, cur
 
 @account.command("delete")
 @click.argument("account_id")
-@click.option("--project", "project_id", default=None, help="Project UUID or name (required when ACCOUNT_ID is a name or counter)")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name (required when ACCOUNT_ID is a name or counter)")
 @click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
 def delete_account(account_id, project_id, yes):
     """Delete an account. ACCOUNT_ID can be a UUID, name, or list counter (#)."""

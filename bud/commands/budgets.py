@@ -15,8 +15,8 @@ def budget():
 
 
 @budget.command("list")
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
-@click.option("--show-id", is_flag=True, default=False, help="Show budget UUIDs")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
+@click.option("--show-id", "-s", is_flag=True, default=False, help="Show budget UUIDs")
 def list_budgets(project_id, show_id):
     """List all budgets for a project."""
     async def _run():
@@ -42,7 +42,7 @@ def list_budgets(project_id, show_id):
 
 @budget.command("create")
 @click.argument("month")
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 def create_budget(month, project_id):
     """Create a budget for a month (YYYY-MM)."""
     async def _run():
@@ -60,8 +60,8 @@ def create_budget(month, project_id):
 @budget.command("edit")
 @click.argument("counter", required=False, type=int, default=None)
 @click.option("--id", "record_id", default=None, help="Budget UUID")
-@click.option("--month", default=None, help="YYYY-MM")
-@click.option("--project", "project_id", default=None, help="Project UUID or name")
+@click.option("--month", "-m", default=None, help="YYYY-MM")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 def edit_budget(counter, record_id, month, project_id):
     """Edit a budget. Specify by list counter (default) or --id."""
     async def _run():
@@ -92,7 +92,7 @@ def edit_budget(counter, record_id, month, project_id):
 
 @budget.command("delete")
 @click.argument("budget_id")
-@click.option("--project", "project_id", default=None, help="Project UUID or name (required when BUDGET_ID is a month name or counter)")
+@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name (required when BUDGET_ID is a month name or counter)")
 @click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
 def delete_budget(budget_id, project_id, yes):
     """Delete a budget. BUDGET_ID can be a UUID, month name (YYYY-MM), or list counter (#)."""
