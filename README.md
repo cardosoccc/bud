@@ -43,31 +43,37 @@ bud db init
 bud db init
 
 # 2. Create a project
-bud project create --name "Personal"
+bud p c --name "Personal"
 
 # 3. Set it as the default (so you don't have to pass --project every time)
-bud project set-default <project-id>
+bud p s Personal
 
 # 4. Set the active month
-bud config set month 2025-02
+bud g s month 2025-03
 
 # 5. Create accounts
-bud account create --name "Bank" --type debit
-bud account create --name "Credit Card" --type credit
+bud a c --name "Bank" --type debit
+bud a c --name "Credit Card" --type credit
 
 # 6. Record transactions
-bud transaction create --value -50 --description "Groceries" --account Bank
-bud transaction create --value 3000 --description "Salary" --account Bank
+bud t c -v -50 -d "Groceries" -a Bank
+bud t c -v 3000 -d "Salary" -a Bank
 
 # 7. View this month's transactions
-bud txns
+bud tt
 
 # 8. Create a budget and add a forecast
-bud budget create 2025-02
-bud forecast create --budget 2025-02 --description "Groceries" --value -200 --category food
+bud b c 2025-03
+bud f c -v -200 -d "Groceries" -c food
 
-# 9. Generate a report
-bud report 2025-02
+# 9. Create a recurrent forecast (monthly rent)
+bud f c -v -1500 -d "Rent" -c housing -r
+
+# 10. Create an installment-based forecast (washer in 10x)
+bud f c -v -300 -d "Washer" -c appliances -i 10
+
+# 11. View the budget status
+bud s
 ```
 
 ---
@@ -97,9 +103,9 @@ A transaction records a money movement relative to a single account. The sign of
 - **Negative value**: money leaving the account (expenses, withdrawals, payments made)
 
 For example:
-- `--value -50 --account Bank` → $50 expense from your bank account
-- `--value 3000 --account Bank` → $3000 income into your bank account
-- `--value -100 --account "Credit Card"` → $100 charged to your credit card
+- `-v -50 -a Bank` → $50 expense from your bank account
+- `-v 3000 -a Bank` → $3000 income into your bank account
+- `-v -100 -a "Credit Card"` → $100 charged to your credit card
 
 Transfers between accounts are handled by creating two separate transactions — one per account — with opposite signs.
 
@@ -142,6 +148,11 @@ A recurrence is a dedicated record that tracks a repeating forecast across month
 - Each forecast linked to a recurrence has a `recurrence_id` foreign key and an optional `installment` number.
 - The installment suffix (e.g. `(3/10)`) is assembled dynamically at display time — it is not stored in the forecast's description field.
 
+**Managing recurrences directly:**
+- Use `bud r l` to list recurrences active in the current month, or `bud r l --all` to see every recurrence in the project.
+- Use `bud r e <counter> --all -d "New Name" --propagate` to edit a recurrence and propagate changes to all linked forecasts.
+- Use `bud r d <counter> --all --cascade -y` to delete a recurrence and all its linked forecasts.
+
 **Editing recurrent forecasts:**
 - A non-recurrent forecast can be turned into an open-ended recurrence via `--recurrent` (and optionally `--recurrence-end`) on the edit command. Turning into an installment-based recurrence via edit is not supported.
 - Editing the description of a recurrent forecast also updates the recurrence's base description.
@@ -149,11 +160,13 @@ A recurrence is a dedicated record that tracks a repeating forecast across month
 
 ### Categories
 
-Categories are global labels (not project-specific) that link forecasts to actual transactions. If a forecast has category "food" and a transaction also has category "food", the report will show how much you actually spent versus what you planned.
+Categories are global labels (not project-specific) that link forecasts to actual transactions. If a forecast has category "food" and a transaction also has category "food", the status report will show how much you actually spent versus what you planned.
 
-### Reports
+When you specify a category name that doesn't exist yet, `bud` will prompt to create it on the spot (works in transaction create/edit, forecast create/edit, and recurrence edit).
 
-A report compares forecasts against actual transactions for a given budget month. For months in the future, `bud` calculates a **projected net balance** by summing forecast values from the current month forward through the target month.
+### Status Report
+
+The status report (formerly "report") compares forecasts against actual transactions for a given budget month. For months in the future, `bud` calculates a **projected net balance** by summing forecast values from the current month forward through the target month.
 
 Installment-based forecasts display their installment number and total in the report (e.g. `Washer (5/10)`).
 
@@ -161,24 +174,23 @@ Installment-based forecasts display their installment number and total in the re
 
 ## All Commands
 
-### Global Options and Shorthands
+### Aliases and Shortcuts
 
-Every command that operates on a project accepts `--project <uuid-or-name>`. If you have a default project set, this option can be omitted.
+`bud` uses single-letter aliases for fast terminal usage. Every alias is visible in `--help` output.
 
-Every command that operates on accounts, categories, or budgets accepts either the UUID or the human-readable name/month as the identifier.
-
-**Command group aliases** — shorter versions of the group names:
+**Command group aliases:**
 
 | Full name | Alias |
 |-----------|-------|
-| `transaction` | `txn` |
-| `budget` | `bdg` |
-| `category` | `cat` |
-| `forecast` | `fct` |
-| `project` | `prj` |
-| `account` | `acc` |
-| `report` | `rep` |
-| `config` | `cfg` |
+| `transaction` | `t` |
+| `budget` | `b` |
+| `category` | `c` |
+| `forecast` | `f` |
+| `project` | `p` |
+| `recurrence` | `r` |
+| `account` | `a` |
+| `status` | `s` |
+| `config` | `g` |
 
 **Subcommand aliases** — within each group, CRUD subcommands have single-letter aliases:
 
@@ -188,238 +200,123 @@ Every command that operates on accounts, categories, or budgets accepts either t
 | `edit` | `e` |
 | `delete` | `d` |
 | `list` | `l` |
+| `show` | `s` |
 
-Additionally, `project set-default` has alias `s`.
+Additionally, `project set-default` has alias `s` and `config set` has alias `s`.
 
-**List shortcuts** — single commands that directly list a resource:
+**List shortcuts** — double-letter commands that directly list a resource:
 
 | Command | Equivalent |
 |---------|------------|
-| `bud txns [--month] [--project]` | `bud transaction list` |
-| `bud bdgs [--project]` | `bud budget list` |
-| `bud cats` | `bud category list` |
-| `bud fcts [--budget] [--project]` | `bud forecast list` |
-| `bud prjs` | `bud project list` |
-| `bud accs [--project]` | `bud account list` |
-| `bud cfgs` | `bud config list` |
+| `bud tt [MONTH]` | `bud t l` |
+| `bud aa` | `bud a l` |
+| `bud bb` | `bud b l` |
+| `bud cc` | `bud c l` |
+| `bud ff [BUDGET]` | `bud f l` |
+| `bud pp` | `bud p l` |
+| `bud rr [MONTH]` | `bud r l` |
+| `bud gg` | `bud g l` |
+
+**Option aliases** — most options have single-letter shortcuts (`-v` for `--value`, `-d` for `--description`, `-p` for `--project`, `-c` for `--category`, `-t` for `--tags` or `--date`, `-a` for `--account`, `-s` for `--show-id`, etc.). Run any command with `--help` to see available shortcuts.
+
+### Global Options
+
+Every command that operates on a project accepts `--project`/`-p` with a UUID or name. If you have a default project set, this option can be omitted.
+
+Every command that operates on accounts, categories, or budgets accepts either the UUID or the human-readable name/month as the identifier.
 
 ---
 
-### `project` — Manage Projects
+### `project` (alias `p`) — Manage Projects
 
 ```
-bud project list
+bud p l                           # list all projects
+bud p c -n <name>                 # create a new project
+bud p e <counter> -n <new-name>   # rename a project (by list #)
+bud p d <id-or-name>              # delete a project (cascades to budgets, transactions, recurrences)
+bud p s <id-or-name>              # set as default project
 ```
-List all projects. Shows ID, name, and which one is the default.
-
-```
-bud project create --name <name>
-```
-Create a new project with the given name.
-
-```
-bud project edit <project-id> --name <new-name>
-```
-Rename a project. The `<project-id>` can be the UUID or the current name.
-
-```
-bud project delete <project-id>
-```
-Delete a project. Prompts for confirmation. This cascades to all budgets and transactions belonging to the project.
-
-```
-bud project set-default <project-id>
-```
-Mark a project as the default. The default project is used automatically when `--project` is not provided.
 
 ---
 
-### `account` — Manage Accounts
+### `account` (alias `a`) — Manage Accounts
 
 ```
-bud account list [--project <id>]
+bud a l                                                # list accounts
+bud a c -n <name> -t <credit|debit> [-i <balance>]     # create account
+bud a e <id-or-name> [-n <name>] [-t <type>]           # edit account
+bud a d <id-or-name>                                   # delete account (blocked if transactions exist)
 ```
-List all accounts for the given project.
-
-```
-bud account create --name <name> --type <type> [--project <id>] [--initial-balance <float>]
-```
-Create a new account. Type must be `credit` or `debit`. The `--initial-balance` option sets a starting balance (default: 0).
-
-```
-bud account edit <account-id> [--name <name>] [--type <type>] [--project <id>]
-```
-Edit an account's name or type.
-
-```
-bud account delete <account-id> [--project <id>]
-```
-Delete an account. Fails if transactions reference it (you must delete or reassign transactions first).
 
 ---
 
-### `transaction` — Manage Transactions
+### `transaction` (alias `t`) — Manage Transactions
 
 ```
-bud transaction list [--month <YYYY-MM>] [--project <id>]
+bud t l [MONTH]                   # list transactions (MONTH = YYYY-MM, defaults to active month)
+bud t s <transaction-id>          # show full transaction details
+bud t c -v <amount> -d <desc> -a <account> [-t <date>] [-c <category>] [--tags <tag1,tag2>]
+bud t e <counter> [MONTH] [-v <amount>] [-d <desc>] [-t <date>] [-c <category>] [--tags <tag1,tag2>]
+bud t d <id-or-counter> [MONTH] [-y]
 ```
-List all transactions for the given month. Defaults to the active month if set. Shows: truncated ID, date, description, value, account.
 
-```
-bud transaction show <transaction-id>
-```
-Show full details of a transaction: ID, date, description, value, account, category, and tags.
-
-```
-bud transaction create \
-  --value <float> \
-  --description <text> \
-  --account <account> \
-  [--date <YYYY-MM-DD>] \
-  [--project <id>] \
-  [--category <name-or-id>] \
-  [--tags <tag1,tag2>]
-```
-Create a transaction. `--account` is required. Use a positive `--value` for money coming in (income, deposits) and a negative `--value` for money going out (expenses, payments). The date defaults to today.
-
-If a `--category` name is given that doesn't exist yet, `bud` will ask if you want to create it on the spot.
-
-```
-bud transaction edit <transaction-id> \
-  [--value <float>] \
-  [--description <text>] \
-  [--date <YYYY-MM-DD>] \
-  [--category <name-or-id>] \
-  [--tags <tag1,tag2>]
-```
-Edit a transaction. Only the fields you provide are updated.
-
-```
-bud transaction delete <transaction-id>
-```
-Delete a transaction. Prompts for confirmation.
+The `MONTH` argument is positional (e.g. `bud t l 2025-03`). When using a list counter for edit/delete, the month scopes which list the counter refers to.
 
 ---
 
-### `budget` — Manage Budgets
+### `budget` (alias `b`) — Manage Budgets
 
 ```
-bud budget list [--project <id>] [--show-id]
+bud b l                           # list all budgets
+bud b c <YYYY-MM>                 # create a budget (auto-populates recurrences)
+bud b e <counter> [-m <YYYY-MM>]  # edit a budget's month
+bud b d <id-or-month-or-counter> [-y]  # delete a budget (cascades to forecasts)
 ```
-List all budgets for the project, ordered by month. Use `--show-id` to display budget UUIDs.
-
-```
-bud budget create <YYYY-MM> [--project <id>]
-```
-Create a monthly budget. The start and end dates are computed automatically from the month string. When a budget is created, any applicable recurrences are automatically populated as forecasts.
-
-```
-bud budget edit <counter> [--id <uuid>] [--month <YYYY-MM>] [--project <id>]
-```
-Edit a budget's month. Specify the budget by its list counter number or `--id`. The start/end dates are recalculated.
-
-```
-bud budget delete <budget-id> [--project <id>] [--yes]
-```
-Delete a budget. `<budget-id>` can be a UUID, month name (`YYYY-MM`), or list counter number. Prompts for confirmation unless `--yes` is passed. Cascades to all forecasts.
 
 ---
 
-### `forecast` — Manage Forecasts
+### `forecast` (alias `f`) — Manage Forecasts
 
 ```
-bud forecast list \
-  [--budget <id>] \
-  [--project <id>] \
-  [--show-id]
+bud f l [BUDGET]                  # list forecasts (BUDGET = UUID or YYYY-MM, defaults to current month)
+bud f c [BUDGET] -v <amount> [-d <desc>] [-c <category>] [-t <tags>] [-r] [-e <end>] [-i <N>]
+bud f e <counter> [BUDGET] [-d <desc>] [-v <amount>] [-c <category>] [-t <tags>] [-r] [-e <end>]
+bud f d <id-or-counter> [BUDGET] [-y]
 ```
-List all forecasts for a budget. `--budget` accepts a UUID or month name (`YYYY-MM`); defaults to the current month. Use `--show-id` to display forecast UUIDs. The output includes a Recurrence column showing installment info (e.g. `3/10`) or `Yes` for open-ended recurrences.
 
-```
-bud forecast create \
-  --value <float> \
-  [--budget <id>] \
-  [--description <text>] \
-  [--category <name-or-id>] \
-  [--tags <tag1,tag2>] \
-  [--recurrent] \
-  [--recurrence-end <YYYY-MM>] \
-  [--installments <N>] \
-  [--current-installment <M>] \
-  [--project <id>]
-```
-Create a forecast line item. Options:
-- `--value`: the expected amount (positive = income, negative = expense). Required.
-- `--budget`: budget UUID or month name; defaults to the current month and is auto-created if missing.
-- `--description`: text description of the forecast.
-- `--category`: links this forecast to a category for actual-vs-forecast comparison. If the category doesn't exist, prompts to create it.
-- `--tags`: comma-separated tags.
-- `--recurrent`: marks this forecast as an open-ended recurrence (repeats every month in future budgets).
-- `--recurrence-end`: last month (`YYYY-MM`) for the recurrence. Implies `--recurrent`.
-- `--installments`: number of total installments. Creates all installments immediately, auto-creating budgets as needed.
-- `--current-installment`: which installment number this month represents (e.g. `5` means this is the 5th of N). Requires `--installments`. Only installments from M through N are created. If omitted, defaults to 1.
+The `BUDGET` argument is positional. If omitted, defaults to the current month's budget. On create, the budget is auto-created if it doesn't exist.
 
-At least one of `--description`, `--category`, or `--tags` must be provided.
-
-```
-bud forecast edit <counter> \
-  [--id <uuid>] \
-  [--description <text>] \
-  [--value <float>] \
-  [--category <name-or-id>] \
-  [--tags <tag1,tag2>] \
-  [--recurrent] \
-  [--recurrence-end <YYYY-MM>] \
-  [--budget <id>] \
-  [--project <id>]
-```
-Edit a forecast. Specify by list counter (default) or `--id`. Only provided fields are updated.
-
-- `--recurrent` / `--recurrence-end`: turns a non-recurrent forecast into an open-ended recurrence. Forecasts are immediately created in existing budgets within the range. Fails if the forecast is already recurrent.
-- Editing the description of a recurrent forecast also updates the recurrence's base description so future budgets use the new description.
-
-```
-bud forecast delete <forecast-id> \
-  [--budget <id>] \
-  [--project <id>] \
-  [--yes]
-```
-Delete a forecast. `<forecast-id>` can be a UUID or list counter number. Prompts for confirmation unless `--yes` is passed.
+Key options for `create`:
+- `-r` / `--recurrent` — marks as open-ended recurrence
+- `-e` / `--recurrence-end YYYY-MM` — last month for the recurrence (implies `-r`)
+- `-i` / `--installments N` — creates N monthly installments
+- `--current-installment M` — start from installment M (requires `-i`)
 
 ---
 
-### `category` — Manage Categories
-
-Categories are global (shared across all projects).
+### `recurrence` (alias `r`) — Manage Recurrences
 
 ```
-bud category list
+bud r l [MONTH]                   # list recurrences active in MONTH (defaults to current month)
+bud r l -a                        # list ALL recurrences in the project
+bud r e <counter> [-a] [-d <desc>] [-v <amount>] [-c <category>] [-t <tags>] [--propagate]
+bud r d <id-or-counter> [-a] [-c] [-y]
 ```
-List all categories.
 
-```
-bud category create --name <name>
-```
-Create a category.
-
-```
-bud category edit <category-id> --name <new-name>
-```
-Rename a category.
-
-```
-bud category delete <category-id>
-```
-Delete a category. Transactions and forecasts that reference it will have their category set to `NULL` (not deleted).
+Key options:
+- `-a` / `--all` — in list: show all recurrences regardless of month. In edit/delete: resolve counter from the full list.
+- `--propagate` — on edit: also update description/value/category/tags on all linked forecasts.
+- `-c` / `--cascade` — on delete: delete all linked forecasts (default: orphan them by setting `recurrence_id` to NULL).
 
 ---
 
-### `report` — Budget Report
+### `status` (alias `s`) — Budget Status Report
 
 ```
-bud report [<budget-id>] [--project <id>]
+bud s [BUDGET] [-p <project>]
 ```
-Generate a report for a budget. `<budget-id>` can be a UUID or a `YYYY-MM` month string. If omitted, defaults to the current month's budget.
+
+Generate a status report for a budget. `BUDGET` can be a UUID or a `YYYY-MM` month string. If omitted, defaults to the current month's budget.
 
 The report shows:
 - **Account balances** — net change for each account in the period, plus calculated and current balances, with an expected balance row that includes the forecast remaining
@@ -428,66 +325,47 @@ The report shows:
 
 ---
 
-### `db` — Database Management
+### `category` (alias `c`) — Manage Categories
+
+Categories are global (shared across all projects).
 
 ```
-bud db init
+bud c l                           # list all categories
+bud c c -n <name>                 # create a category
+bud c e <id-or-name> -n <new-name>  # rename a category
+bud c d <id-or-name>              # delete (sets category_id to NULL on referencing records)
 ```
-Create the `~/.bud/` directory and initialize all database tables. Creates a "default" project automatically. Safe to run multiple times (no-op if already initialized).
-
-```
-bud db migrate
-```
-Run pending database migrations. Creates any new tables, adds new columns to existing tables, and migrates old data to the new schema (e.g. converting old `is_recurrent` flag-based forecasts into proper recurrence records).
-
-```
-bud db destroy
-```
-Delete the database file (`~/.bud/bud.db`). Prompts for confirmation. This is irreversible.
-
-```
-bud db reset
-```
-Destroy and re-initialize the database. Prompts for confirmation. All data is lost.
-
-```
-bud db push [--force]
-```
-Upload the local database to the configured cloud storage bucket. `bud` tracks a version number in `~/.bud/sync_meta.json`. If the remote has a newer version, the push is blocked unless `--force` is passed.
-
-```
-bud db pull [--force]
-```
-Download the database from cloud storage. If the local version is newer, the pull is blocked unless `--force` is passed. A backup of the local database is created at `~/.bud/bud.db.bak` before overwriting.
 
 ---
 
-### `config` — Configuration
+### `db` — Database Management
 
 ```
-bud config set <key> <value>
+bud db init                       # create ~/.bud/ and initialize tables
+bud db migrate                    # run pending migrations
+bud db destroy                    # delete the database file (irreversible)
+bud db reset                      # destroy + re-initialize
+bud db push [--force]             # upload database to cloud storage
+bud db pull [--force]             # download database from cloud storage
 ```
-Set a configuration value. Examples:
+
+---
+
+### `config` (alias `g`) — Configuration
+
+```
+bud g s <key> <value>             # set a config value
+bud g l                           # list current config
+bud g aws                         # store AWS credentials
+bud g gcp                         # store GCP service account path
+```
+
+Common config keys:
 ```bash
-bud config set month 2025-02       # set the active month
-bud config set bucket s3://my-bucket/bud
-bud config set bucket gs://my-bucket/bud
+bud g s month 2025-03                   # set the active month
+bud g s bucket s3://my-bucket/bud       # set cloud sync bucket
+bud g s bucket gs://my-bucket/bud
 ```
-
-```
-bud config list
-```
-Print the current configuration.
-
-```
-bud config aws
-```
-Interactively store AWS credentials (`access_key_id` and `secret_access_key`) in `~/.bud/credentials.json` (mode 0600).
-
-```
-bud config gcp
-```
-Store the path to a GCP service account key file in `~/.bud/credentials.json`.
 
 ---
 
@@ -499,14 +377,14 @@ Store the path to a GCP service account key file in `~/.bud/credentials.json`.
 
 **AWS S3:**
 ```bash
-bud config aws                          # store credentials
-bud config set bucket s3://my-bucket/bud
+bud g aws                                # store credentials
+bud g s bucket s3://my-bucket/bud
 ```
 
 **Google Cloud Storage:**
 ```bash
-bud config gcp                          # store path to service account JSON key
-bud config set bucket gs://my-bucket/bud
+bud g gcp                                # store path to service account JSON key
+bud g s bucket gs://my-bucket/bud
 ```
 
 ### Sync Workflow
@@ -541,8 +419,9 @@ bud/
 │   │   ├── transactions.py
 │   │   ├── budgets.py
 │   │   ├── forecasts.py
+│   │   ├── recurrences.py
 │   │   ├── categories.py
-│   │   ├── reports.py
+│   │   ├── reports.py            # status report display
 │   │   ├── db.py                 # Session factory + run_async() helper
 │   │   ├── db_commands.py        # db init / destroy / reset / migrate
 │   │   ├── sync.py               # db push / pull
@@ -645,7 +524,11 @@ Resolution logic in `commands/utils.py`:
 2. Otherwise → query the database by name, scoped to the relevant project where applicable
 3. Return the UUID or `None` if not found (CLI will print an error)
 
-This means you can write `bud transaction create --account "Bank"` instead of copying UUIDs from list output.
+This means you can write `bud t c -a "Bank"` instead of copying UUIDs from list output.
+
+### Counter-Based Selection
+
+Most edit and delete commands accept a **list counter** (the `#` column from list output) instead of a UUID. The counter is 1-indexed and refers to the item's position in the most recent list. For transactions and forecasts, the counter is scoped to a month/budget. For recurrences, use `--all` to resolve the counter from the full project list.
 
 ### Cloud Storage Versioning
 
@@ -668,7 +551,7 @@ The `--force` flag bypasses the version check in either direction.
 | File | Contents |
 |------|----------|
 | `bud.db` | SQLite database |
-| `config.json` | User settings (`active_month`, `default_project_id`, `bucket`) |
+| `config.json` | User settings (`month`, `default_project_id`, `bucket`) |
 | `credentials.json` | Cloud credentials (mode 0600) |
 | `sync_meta.json` | Sync version tracking |
 | `bud.db.bak` | Automatic backup created before each pull |
@@ -722,7 +605,7 @@ categories
 - Deleting a project cascades to its budgets, transactions, and recurrences
 - Deleting a budget cascades to its forecasts
 - Deleting a category sets `category_id` to `NULL` on transactions and forecasts (does not delete them)
-- Deleting a recurrence sets `recurrence_id` to `NULL` on its forecasts (does not delete them)
+- Deleting a recurrence sets `recurrence_id` to `NULL` on its forecasts (does not delete them) — unless `--cascade` is used, which deletes them
 - Deleting an account is blocked (`RESTRICT`) if any transaction references it
 
 ---
