@@ -72,7 +72,10 @@ bud f c -v -1500 -d "Rent" -c housing -r
 # 10. Create an installment-based forecast (washer in 10x)
 bud f c -v -300 -d "Washer" -c appliances -i 10
 
-# 11. View the budget status
+# 11. Create a transaction from a forecast (uses forecast #1 from bud ff)
+bud t c -f 1 -a Bank
+
+# 12. View the budget status
 bud s
 ```
 
@@ -217,7 +220,7 @@ Additionally, `project set-default` has alias `s` and `config set` has alias `s`
 | `bud rr [MONTH]` | `bud r l` |
 | `bud gg` | `bud g l` |
 
-**Option aliases** — most options have single-letter shortcuts (`-v` for `--value`, `-d` for `--description`, `-p` for `--project`, `-c` for `--category`, `-t` for `--tags` or `--date`, `-a` for `--account`, `-s` for `--show-id`, etc.). Run any command with `--help` to see available shortcuts.
+**Option aliases** — most options have single-letter shortcuts (`-v` for `--value`, `-d` for `--description`, `-p` for `--project`, `-c` for `--category`, `-t` for `--tags` or `--date`, `-a` for `--account`, `-s` for `--show-id`, `-f` for `--forecast`, etc.). Run any command with `--help` to see available shortcuts.
 
 ### Global Options
 
@@ -256,11 +259,15 @@ bud a d <id-or-name>                                   # delete account (blocked
 bud t l [MONTH]                   # list transactions (MONTH = YYYY-MM, defaults to active month)
 bud t s <transaction-id>          # show full transaction details
 bud t c -v <amount> -d <desc> -a <account> [-t <date>] [-c <category>] [--tags <tag1,tag2>]
+bud t c -f <forecast#> -a <account> [-t <date>] [-v <amount>] [-d <desc>] [-c <category>] [--tags <tag1,tag2>]
 bud t e <counter> [MONTH] [-v <amount>] [-d <desc>] [-t <date>] [-c <category>] [--tags <tag1,tag2>]
 bud t d <id-or-counter> [MONTH] [-y]
 ```
 
 The `MONTH` argument is positional (e.g. `bud t l 2025-03`). When using a list counter for edit/delete, the month scopes which list the counter refers to.
+
+Key option for `create`:
+- `-f` / `--forecast` — create a transaction from an existing forecast. The forecast is identified by its positional counter (`#` column from `bud ff`) in the budget of the month corresponding to the transaction date. Value, description, category, and tags are pre-filled from the forecast but can be overridden with explicit options. When using `-f`, only `--account` is required.
 
 ---
 

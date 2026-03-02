@@ -35,12 +35,18 @@ from bud.commands.transactions import transaction
 from bud.database import Base
 from bud.models.account import AccountType
 from bud.schemas.account import AccountCreate
+from bud.schemas.budget import BudgetCreate
 from bud.schemas.category import CategoryCreate
+from bud.schemas.forecast import ForecastCreate
 from bud.schemas.project import ProjectCreate
+from bud.schemas.recurrence import RecurrenceCreate
 from bud.schemas.transaction import TransactionCreate
 from bud.services import accounts as account_service
+from bud.services import budgets as budget_service
 from bud.services import categories as category_service
+from bud.services import forecasts as forecast_service
 from bud.services import projects as project_service
+from bud.services import recurrences as recurrence_service
 from bud.services import transactions as transaction_service
 
 
@@ -1268,3 +1274,339 @@ def test_txns_shortcut_uses_default_month(runner, cli_db):
 
     assert result.exit_code == 0
     assert "DefaultMonthTx" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Helpers for --forecast tests
+# ---------------------------------------------------------------------------
+
+async def _seed_budget(db_url, project_id, month="2025-01"):
+    engine = create_async_engine(db_url, echo=False)
+    Session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with Session() as session:
+        b = await budget_service.create_budget(session, BudgetCreate(name=month, project_id=project_id))
+        result = (b.id, b.name)
+    await engine.dispose()
+    return result
+
+
+async def _seed_forecast(
+    db_url, budget_id, *,
+    value=-100, description=None, category_id=None, tags=None,
+    recurrence_id=None, installment=None,
+):
+    engine = create_async_engine(db_url, echo=False)
+    Session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with Session() as session:
+        f = await forecast_service.create_forecast(
+            session,
+            ForecastCreate(
+                description=description,
+                value=Decimal(str(value)),
+                budget_id=budget_id,
+                category_id=category_id,
+                tags=tags or [],
+                recurrence_id=recurrence_id,
+                installment=installment,
+            ),
+        )
+        result = f.id
+    await engine.dispose()
+    return result
+
+
+async def _seed_recurrence(
+    db_url, project_id, *,
+    start="2025-01", installments=None, base_description=None,
+    value=-100, category_id=None, tags=None,
+):
+    engine = create_async_engine(db_url, echo=False)
+    Session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with Session() as session:
+        r = await recurrence_service.create_recurrence(
+            session,
+            RecurrenceCreate(
+                start=start,
+                installments=installments,
+                base_description=base_description,
+                value=Decimal(str(value)),
+                category_id=category_id,
+                tags=tags or [],
+                project_id=project_id,
+            ),
+        )
+        result = r.id
+    await engine.dispose()
+    return result
+
+
+# ---------------------------------------------------------------------------
+# transaction create --forecast
+# ---------------------------------------------------------------------------
+
+def test_create_from_forecast_basic(runner, cli_db):
+    """--forecast pre-fills value, description, category, and tags from forecast."""
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    cid, _ = asyncio.run(_seed_category(cli_db, "food"))
+    bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+    asyncio.run(_seed_forecast(
+        cli_db, bid, value=-200, description="Groceries", category_id=cid, tags=["market"],
+    ))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, [
+            "create", "--forecast", "1", "--account", str(aid), "--date", "2025-01-15",
+        ])
+
+    assert result.exit_code == 0
+    assert "created transaction" in result.output
+    assert "Groceries" in result.output
+    assert "-200" in result.output
+
+    txns = asyncio.run(_fetch_all_transactions(cli_db, pid))
+    assert len(txns) == 1
+    t = txns[0]
+    assert t.description == "Groceries"
+    assert t.value == Decimal("-200")
+    assert t.category_id == cid
+    assert "market" in t.tags
+
+
+def test_create_from_forecast_short_flag(runner, cli_db):
+    """-f short flag works."""
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+    asyncio.run(_seed_forecast(cli_db, bid, value=-50, description="Coffee"))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, [
+            "create", "-f", "1", "-a", str(aid), "-t", "2025-01-10",
+        ])
+
+    assert result.exit_code == 0
+    assert "Coffee" in result.output
+
+
+def test_create_from_forecast_overrides_value(runner, cli_db):
+    """Explicit --value overrides forecast value."""
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+    asyncio.run(_seed_forecast(cli_db, bid, value=-200, description="Groceries"))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, [
+            "create", "-f", "1", "-a", str(aid), "-t", "2025-01-10", "-v", "-150",
+        ])
+
+    assert result.exit_code == 0
+    txns = asyncio.run(_fetch_all_transactions(cli_db, pid))
+    assert txns[0].value == Decimal("-150")
+
+
+def test_create_from_forecast_overrides_description(runner, cli_db):
+    """Explicit --description overrides forecast description."""
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+    asyncio.run(_seed_forecast(cli_db, bid, value=-200, description="Groceries"))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, [
+            "create", "-f", "1", "-a", str(aid), "-t", "2025-01-10", "-d", "Custom Desc",
+        ])
+
+    assert result.exit_code == 0
+    txns = asyncio.run(_fetch_all_transactions(cli_db, pid))
+    assert txns[0].description == "Custom Desc"
+
+
+def test_create_from_forecast_overrides_category(runner, cli_db):
+    """Explicit --category overrides forecast category."""
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    cid_food, _ = asyncio.run(_seed_category(cli_db, "food"))
+    cid_transport, _ = asyncio.run(_seed_category(cli_db, "transport"))
+    bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+    asyncio.run(_seed_forecast(cli_db, bid, value=-200, description="Groceries", category_id=cid_food))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, [
+            "create", "-f", "1", "-a", str(aid), "-t", "2025-01-10", "-c", "transport",
+        ])
+
+    assert result.exit_code == 0
+    txns = asyncio.run(_fetch_all_transactions(cli_db, pid))
+    assert txns[0].category_id == cid_transport
+
+
+def test_create_from_forecast_overrides_tags(runner, cli_db):
+    """Explicit --tags overrides forecast tags."""
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+    asyncio.run(_seed_forecast(cli_db, bid, value=-200, description="Groceries", tags=["market"]))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, [
+            "create", "-f", "1", "-a", str(aid), "-t", "2025-01-10", "--tags", "custom,tag",
+        ])
+
+    assert result.exit_code == 0
+    txns = asyncio.run(_fetch_all_transactions(cli_db, pid))
+    assert "custom" in txns[0].tags
+    assert "tag" in txns[0].tags
+    assert "market" not in txns[0].tags
+
+
+def test_create_from_forecast_no_budget_errors(runner, cli_db):
+    """--forecast with no budget for the month shows error."""
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, [
+            "create", "-f", "1", "-a", str(aid), "-t", "2025-01-10",
+        ])
+
+    assert result.exit_code == 0
+    assert "budget not found" in result.stderr
+
+
+def test_create_from_forecast_out_of_range_errors(runner, cli_db):
+    """--forecast with counter out of range shows error."""
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+    asyncio.run(_seed_forecast(cli_db, bid, value=-50, description="Only one"))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, [
+            "create", "-f", "5", "-a", str(aid), "-t", "2025-01-10",
+        ])
+
+    assert result.exit_code == 0
+    assert "forecast #5 not found" in result.stderr
+
+
+def test_create_from_forecast_uses_date_month(runner, cli_db):
+    """Forecast is looked up from the month of the transaction date."""
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    bid_jan, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+    bid_feb, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-02"))
+    asyncio.run(_seed_forecast(cli_db, bid_jan, value=-100, description="Jan Forecast"))
+    asyncio.run(_seed_forecast(cli_db, bid_feb, value=-200, description="Feb Forecast"))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, [
+            "create", "-f", "1", "-a", str(aid), "-t", "2025-02-10",
+        ])
+
+    assert result.exit_code == 0
+    assert "Feb Forecast" in result.output
+
+    txns = asyncio.run(_fetch_all_transactions(cli_db, pid))
+    assert txns[0].value == Decimal("-200")
+
+
+def test_create_from_forecast_defaults_date_to_today(runner, cli_db):
+    """Without --date, transaction date defaults to today; forecast month derived from it."""
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    today = date.today()
+    month_str = f"{today.year}-{today.month:02d}"
+    bid, _ = asyncio.run(_seed_budget(cli_db, pid, month_str))
+    asyncio.run(_seed_forecast(cli_db, bid, value=-75, description="TodayForecast"))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, [
+            "create", "-f", "1", "-a", str(aid),
+        ])
+
+    assert result.exit_code == 0
+    assert "TodayForecast" in result.output
+
+
+def test_create_from_forecast_second_counter(runner, cli_db):
+    """--forecast 2 picks the second forecast in the list."""
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+    asyncio.run(_seed_forecast(cli_db, bid, value=-100, description="First"))
+    asyncio.run(_seed_forecast(cli_db, bid, value=-200, description="Second"))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, [
+            "create", "-f", "2", "-a", str(aid), "-t", "2025-01-10",
+        ])
+
+    assert result.exit_code == 0
+    assert "Second" in result.output
+    txns = asyncio.run(_fetch_all_transactions(cli_db, pid))
+    assert txns[0].value == Decimal("-200")
+
+
+def test_create_from_forecast_no_category_on_forecast(runner, cli_db):
+    """Forecast without category creates transaction without category."""
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+    asyncio.run(_seed_forecast(cli_db, bid, value=-50, description="NoCat"))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, [
+            "create", "-f", "1", "-a", str(aid), "-t", "2025-01-10",
+        ])
+
+    assert result.exit_code == 0
+    txns = asyncio.run(_fetch_all_transactions(cli_db, pid))
+    assert txns[0].category_id is None
+
+
+def test_create_from_forecast_installment_description(runner, cli_db):
+    """Installment forecast shows suffix like (2/10) in transaction description."""
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+    bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+    rec_id = asyncio.run(_seed_recurrence(
+        cli_db, pid, start="2025-01", installments=10,
+        base_description="Washer", value=-300,
+    ))
+    asyncio.run(_seed_forecast(
+        cli_db, bid, value=-300, description="Washer",
+        recurrence_id=rec_id, installment=2,
+    ))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(transaction, [
+            "create", "-f", "1", "-a", str(aid), "-t", "2025-01-15",
+        ])
+
+    assert result.exit_code == 0
+    txns = asyncio.run(_fetch_all_transactions(cli_db, pid))
+    assert txns[0].description == "Washer (2/10)"
+
+
+def test_create_from_forecast_without_value_or_desc_fails(runner, cli_db):
+    """Without --forecast, omitting --value or --description still fails."""
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
+        result = runner.invoke(transaction, [
+            "create", "--account", str(uuid.uuid4()),
+        ])
+    assert result.exit_code != 0

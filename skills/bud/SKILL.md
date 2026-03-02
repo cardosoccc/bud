@@ -49,7 +49,7 @@ comandos de duas letras listam um recurso diretamente: `tt` (transacoes), `ff` (
 
 ### aliases de opcoes comuns
 
-`-v` valor, `-d` descricao, `-p` projeto, `-c` categoria, `-t` tags (ou data em transacoes), `-a` conta (ou --all em recorrencias), `-s` mostrar-id, `-n` nome, `-y` sim (pular confirmacao), `-r` recorrente, `-e` fim-recorrencia, `-i` parcelas.
+`-v` valor, `-d` descricao, `-p` projeto, `-c` categoria, `-t` tags (ou data em transacoes), `-a` conta (ou --all em recorrencias), `-s` mostrar-id, `-n` nome, `-y` sim (pular confirmacao), `-r` recorrente, `-e` fim-recorrencia, `-i` parcelas, `-f` previsao (criar transacao a partir de previsao).
 
 ## fluxo de configuracao
 
@@ -82,12 +82,23 @@ bud tt
 # listar transacoes de um mes especifico
 bud tt 2025-02
 
+# criar transacao a partir de previsao #1 do mes (usa bud ff para ver previsoes)
+bud t c -f 1 -a banco
+
+# criar transacao a partir de previsao com data especifica
+bud t c -f 3 -a cartao -t 2025-03-15
+
+# criar transacao a partir de previsao sobrescrevendo valor
+bud t c -f 1 -a banco -v -180
+
 # editar transacao #3 da lista do mes atual
 bud t e 3 -v -45 -d "mercado (corrigido)"
 
 # excluir transacao #2 (sem confirmacao)
 bud t d 2 -y
 ```
+
+ao usar `-f`, o valor, descricao, categoria e tags sao preenchidos automaticamente a partir da previsao. o contador (`#`) refere-se a posicao na lista de previsoes do mes correspondente a data da transacao. apenas `-a` (conta) e obrigatorio. opcoes explicitas (`-v`, `-d`, `-c`, `--tags`) sobrescrevem os valores da previsao.
 
 ## orcamentos e previsoes
 
