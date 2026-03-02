@@ -239,18 +239,21 @@ bud db reset      # destruir + reinicializar
 
 - caso o usuário crie novas contas ou exclua, atualize essa seção;
 
+- transferências devem ter categoria e tag "transferências" e a descrição deve ser "transferência origem->destino";
+
 - as transações são armazenadas nestas categorias:
 
    # | name
 -----+------------
    1 | cartão
    2 | filhas
-   3 | moradia
-   4 | outros
-   5 | salário
-   6 | transporte
-   7 | investimentos
-   8 | rendimentos
+   3 | investimentos
+   4 | moradia
+   5 | outros
+   6 | rendimentos
+   7 | salário
+   8 | transferências
+   9 | transporte
 
 gastos com cartão de crédito são armazenados na categoria "cartão", exceto:
 
@@ -283,6 +286,7 @@ as tags que geralmente são utilizadas são:
 - "educação"
 - "vestuário"
 - "aluguel", "dividendos", "jcp" para rendimentos provenientes de investimentos (aluguel de ações, dividendos; jcp);
+- "transferências" para transferências internas entre contas
 
 ## importação de transações (imagens, csv, pdf)
 
