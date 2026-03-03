@@ -83,7 +83,7 @@ def _filtered_forecasts(items, filter_expr):
 @click.argument("budget_id", default=None, required=False)
 @click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 @click.option("--show-id", "-s", is_flag=True, default=False, help="Show forecast UUIDs")
-@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (e.g. \"t=fixo;c=outros;v<0\")")
+@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (e.g. \"a=bb;t=fixo;c=outros;v<0\")")
 def list_forecasts(budget_id, project_id, show_id, filter_expr):
     """List all forecasts for a budget. Defaults to the current month's budget."""
     async def _run():
