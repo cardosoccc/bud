@@ -8,6 +8,7 @@ from bud.commands.utils import (
     resolve_project_id, resolve_account_id, resolve_category_id, is_uuid,
     require_month,
 )
+from bud.filter import apply_filter
 from bud.schemas.transaction import TransactionCreate, TransactionUpdate
 from bud.services import transactions as transaction_service
 
@@ -18,12 +19,19 @@ def transaction():
     pass
 
 
+def _filtered_transactions(items, filter_expr):
+    """Apply filter DSL to a list of transactions."""
+    if not filter_expr:
+        return items
+    return apply_filter(items, filter_expr)
+
+
 @transaction.command("list")
 @click.argument("month", default=None, required=False)
 @click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 @click.option("--show-id", "-s", is_flag=True, default=False, help="Show transaction UUIDs")
-@click.option("--tags", "-t", "filter_tags", default=None, help="Filter by tags (comma-separated, AND logic)")
-def list_transactions(month, project_id, show_id, filter_tags):
+@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (e.g. \"t=fixo;c=outros;v<0\")")
+def list_transactions(month, project_id, show_id, filter_expr):
     """List transactions for a given month."""
     async def _run():
         async with get_session() as db:
@@ -34,9 +42,7 @@ def list_transactions(month, project_id, show_id, filter_tags):
             from bud.commands.utils import require_month
             m = require_month(month)
             items = await transaction_service.list_transactions(db, pid, m)
-            if filter_tags:
-                required = [t.strip() for t in filter_tags.split(",")]
-                items = [t for t in items if t.tags and all(tag in t.tags for tag in required)]
+            items = _filtered_transactions(items, filter_expr)
             if not items:
                 click.echo("no transactions found.")
                 return
@@ -190,9 +196,10 @@ def create_transaction(value, description, txn_date, account_id, project_id, cat
 @click.option("--date", "-t", "txn_date", default=None)
 @click.option("--category", "-c", "category_id", default=None, help="Category UUID or name")
 @click.option("--tags", default=None, help="Comma-separated tags")
+@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (counter references filtered list)")
 @click.argument("month", default=None, required=False)
 @click.option("--project", "-p", "project_id", default=None, help="Project UUID or name (required when using counter)")
-def edit_transaction(counter, record_id, value, description, txn_date, category_id, tags, month, project_id):
+def edit_transaction(counter, record_id, value, description, txn_date, category_id, tags, filter_expr, month, project_id):
     """Edit a transaction. Specify by list counter (default) or --id."""
     async def _run():
         async with get_session() as db:
@@ -205,6 +212,7 @@ def edit_transaction(counter, record_id, value, description, txn_date, category_
                     return
                 m = require_month(month)
                 items = await transaction_service.list_transactions(db, pid, m)
+                items = _filtered_transactions(items, filter_expr)
                 if counter < 1 or counter > len(items):
                     click.echo(f"transaction #{counter} not found in list.", err=True)
                     return
@@ -252,7 +260,8 @@ def edit_transaction(counter, record_id, value, description, txn_date, category_
 @click.argument("month", default=None, required=False)
 @click.option("--project", "-p", "project_id", default=None, help="Project UUID or name (required when TRANSACTION_ID is a counter)")
 @click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
-def delete_transaction(transaction_id, month, project_id, yes):
+@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (counter references filtered list)")
+def delete_transaction(transaction_id, month, project_id, yes, filter_expr):
     """Delete a transaction. TRANSACTION_ID can be a UUID or a list counter (#)."""
     async def _run():
         async with get_session() as db:
@@ -264,6 +273,7 @@ def delete_transaction(transaction_id, month, project_id, yes):
                     return
                 m = require_month(month)
                 items = await transaction_service.list_transactions(db, pid, m)
+                items = _filtered_transactions(items, filter_expr)
                 n = int(transaction_id)
                 if n < 1 or n > len(items):
                     click.echo(f"transaction #{n} not found in list.", err=True)

@@ -49,7 +49,7 @@ comandos de duas letras listam um recurso diretamente: `tt` (transacoes), `ff` (
 
 ### aliases de opcoes comuns
 
-`-v` valor, `-d` descricao, `-p` projeto, `-c` categoria, `-t` tags (ou data em transacoes; em comandos de listagem, filtra por tags com logica AND), `-a` conta (ou --all em recorrencias), `-s` mostrar-id, `-n` nome, `-y` sim (pular confirmacao), `-r` recorrente, `-e` fim-recorrencia, `-i` parcelas, `-f` previsao (criar transacao a partir de previsao).
+`-v` valor, `-d` descricao, `-p` projeto, `-c` categoria, `-t` tags (ou data em transacoes), `-a` conta (ou --all em recorrencias), `-s` mostrar-id, `-n` nome, `-y` sim (pular confirmacao), `-r` recorrente, `-e` fim-recorrencia, `-i` parcelas, `-f` filtro (em list/edit/delete) ou previsao (em `t c`).
 
 ## fluxo de configuracao
 
@@ -91,9 +91,10 @@ bud tt
 # listar transacoes de um mes especifico
 bud tt 2025-02
 
-# filtrar transacoes por tags (AND: todas as tags devem estar presentes)
-bud tt -t fixo
-bud tt -t fixo,moradia
+# filtrar com DSL (campos: c=categoria, t=tags, v=valor, d=descricao; separador: ";")
+bud tt -f "t=fixo"
+bud tt -f "t=fixo,moradia;c=outros"
+bud tt -f "v<0;d=mercado"
 
 # editar transacao #3 da lista do mes atual
 bud t e 3 -v -45 -d "mercado (corrigido)"
@@ -133,9 +134,9 @@ bud f c -v -300 -d "maquina de lavar" -c eletrodomesticos -i 10 --current-instal
 # listar previsoes do mes atual
 bud ff
 
-# filtrar previsoes por tags (AND: todas as tags devem estar presentes)
-bud ff -t fixo
-bud ff -t fixo,moradia
+# filtrar previsoes com DSL
+bud ff -f "t=fixo"
+bud ff -f "t=fixo,moradia;v<0"
 
 # editar previsao #2 do mes atual
 bud f e 2 -v -250
@@ -155,9 +156,9 @@ bud rr
 # listar todas as recorrencias do projeto
 bud r l -a
 
-# filtrar recorrencias por tags (AND: todas as tags devem estar presentes)
-bud rr -t fixo
-bud r l -a -t fixo,moradia
+# filtrar recorrencias com DSL
+bud rr -f "t=fixo"
+bud r l -a -f "t=fixo,moradia;c=moradia"
 
 # editar recorrencia #3 da lista completa, atualizar valor, propagar para previsoes vinculadas
 bud r e 3 -a -v -1600 --propagate
@@ -167,6 +168,24 @@ bud r d 5 -a -c -y
 
 # excluir recorrencia mas manter previsoes (ficam orfas)
 bud r d 5 -a -y
+```
+
+## filtro DSL (-f / --filter)
+
+disponivel nos subcomandos list, edit e delete de transacoes, previsoes e recorrencias. clausulas separadas por ";", logica AND.
+
+campos: `c` (categoria, exato), `t` (tags, AND entre tags separadas por virgula), `v` (valor, operadores `=` `>` `<` `>=` `<=`), `d` (descricao, `=` substring, `==` exato). comparacoes de texto sao case-insensitive.
+
+```bash
+# exemplos
+bud tt -f "t=fixo;c=moradia;v<0"
+bud ff -f "d=aluguel;v<=-1500"
+bud r l -a -f "t=fixo,moradia"
+
+# editar/excluir usando contador da lista filtrada
+bud tt -f "t=fixo"
+bud t e 2 -f "t=fixo" -v -200
+bud t d 1 -f "t=fixo" -y
 ```
 
 ## visualizando relatorios de status
