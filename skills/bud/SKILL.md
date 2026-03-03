@@ -49,7 +49,7 @@ comandos de duas letras listam um recurso diretamente: `tt` (transacoes), `ff` (
 
 ### aliases de opcoes comuns
 
-`-v` valor, `-d` descricao, `-p` projeto, `-c` categoria, `-t` tags (ou data em transacoes), `-a` conta (ou --all em recorrencias), `-s` mostrar-id, `-n` nome, `-y` sim (pular confirmacao), `-r` recorrente, `-e` fim-recorrencia, `-i` parcelas, `-f` previsao (criar transacao a partir de previsao).
+`-v` valor, `-d` descricao, `-p` projeto, `-c` categoria, `-t` tags (ou data em transacoes; em comandos de listagem, filtra por tags com logica AND), `-a` conta (ou --all em recorrencias), `-s` mostrar-id, `-n` nome, `-y` sim (pular confirmacao), `-r` recorrente, `-e` fim-recorrencia, `-i` parcelas, `-f` previsao (criar transacao a partir de previsao).
 
 ## fluxo de configuracao
 
@@ -91,6 +91,10 @@ bud tt
 # listar transacoes de um mes especifico
 bud tt 2025-02
 
+# filtrar transacoes por tags (AND: todas as tags devem estar presentes)
+bud tt -t fixo
+bud tt -t fixo,moradia
+
 # editar transacao #3 da lista do mes atual
 bud t e 3 -v -45 -d "mercado (corrigido)"
 
@@ -129,6 +133,10 @@ bud f c -v -300 -d "maquina de lavar" -c eletrodomesticos -i 10 --current-instal
 # listar previsoes do mes atual
 bud ff
 
+# filtrar previsoes por tags (AND: todas as tags devem estar presentes)
+bud ff -t fixo
+bud ff -t fixo,moradia
+
 # editar previsao #2 do mes atual
 bud f e 2 -v -250
 
@@ -146,6 +154,10 @@ bud rr
 
 # listar todas as recorrencias do projeto
 bud r l -a
+
+# filtrar recorrencias por tags (AND: todas as tags devem estar presentes)
+bud rr -t fixo
+bud r l -a -t fixo,moradia
 
 # editar recorrencia #3 da lista completa, atualizar valor, propagar para previsoes vinculadas
 bud r e 3 -a -v -1600 --propagate

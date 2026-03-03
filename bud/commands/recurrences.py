@@ -46,13 +46,17 @@ async def _resolve_items(db, project_id, month, show_all):
 @click.option("--all", "-a", "show_all", is_flag=True, default=False, help="Show all recurrences")
 @click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 @click.option("--show-id", "-s", is_flag=True, default=False, help="Show recurrence UUIDs")
-def list_recurrences(month, show_all, project_id, show_id):
+@click.option("--tags", "-t", "filter_tags", default=None, help="Filter by tags (comma-separated, AND logic)")
+def list_recurrences(month, show_all, project_id, show_id, filter_tags):
     """List recurrences. Defaults to those active in the current month."""
     async def _run():
         async with get_session() as db:
             pid, items = await _resolve_items(db, project_id, month, show_all)
             if pid is None:
                 return
+            if items and filter_tags:
+                required = [t.strip() for t in filter_tags.split(",")]
+                items = [r for r in items if r.tags and all(tag in r.tags for tag in required)]
             if not items:
                 click.echo("no recurrences found.")
                 return

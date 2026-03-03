@@ -70,7 +70,8 @@ async def _resolve_or_create_budget_id(db, budget_id, project_id):
 @click.argument("budget_id", default=None, required=False)
 @click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 @click.option("--show-id", "-s", is_flag=True, default=False, help="Show forecast UUIDs")
-def list_forecasts(budget_id, project_id, show_id):
+@click.option("--tags", "-t", "filter_tags", default=None, help="Filter by tags (comma-separated, AND logic)")
+def list_forecasts(budget_id, project_id, show_id, filter_tags):
     """List all forecasts for a budget. Defaults to the current month's budget."""
     async def _run():
         from bud.commands.utils import require_month
@@ -91,6 +92,9 @@ def list_forecasts(budget_id, project_id, show_id):
                 if not bid:
                     return
             items = await forecast_service.list_forecasts(db, bid)
+            if filter_tags:
+                required = [t.strip() for t in filter_tags.split(",")]
+                items = [f for f in items if f.tags and all(tag in f.tags for tag in required)]
             if not items:
                 click.echo("no forecasts found.")
                 return

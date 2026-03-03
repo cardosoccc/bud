@@ -217,7 +217,7 @@ Additionally, `project set-default` has alias `s` and `config set` has alias `s`
 | `bud rr [MONTH]` | `bud r l` |
 | `bud gg` | `bud g l` |
 
-**Option aliases** — most options have single-letter shortcuts (`-v` for `--value`, `-d` for `--description`, `-p` for `--project`, `-c` for `--category`, `-t` for `--tags` or `--date`, `-a` for `--account`, `-s` for `--show-id`, etc.). Run any command with `--help` to see available shortcuts.
+**Option aliases** — most options have single-letter shortcuts (`-v` for `--value`, `-d` for `--description`, `-p` for `--project`, `-c` for `--category`, `-t` for `--tags` or `--date`, `-a` for `--account`, `-s` for `--show-id`, etc.). In list commands, `-t` filters results by tags (comma-separated, AND logic). Run any command with `--help` to see available shortcuts.
 
 ### Global Options
 
@@ -254,6 +254,8 @@ bud a d <id-or-name>                                   # delete account (blocked
 
 ```
 bud t l [MONTH]                   # list transactions (MONTH = YYYY-MM, defaults to active month)
+bud t l -t fixo                   # list only transactions tagged "fixo"
+bud t l -t fixo,moradia           # list transactions with BOTH tags (AND logic)
 bud t s <transaction-id>          # show full transaction details
 bud t c -v <amount> -d <desc> -a <account> [-t <date>] [-c <category>] [--tags <tag1,tag2>]
 bud t c -f <forecast #> -a <account> [-t <date>] [-v <amount>] [-d <desc>] [-c <category>] [--tags <tag1,tag2>]
@@ -284,6 +286,8 @@ bud b d <id-or-month-or-counter> [-y]  # delete a budget (cascades to forecasts)
 
 ```
 bud f l [BUDGET]                  # list forecasts (BUDGET = UUID or YYYY-MM, defaults to current month)
+bud f l -t fixo                   # list only forecasts tagged "fixo"
+bud f l -t fixo,moradia           # list forecasts with BOTH tags (AND logic)
 bud f c [BUDGET] -v <amount> [-d <desc>] [-c <category>] [-t <tags>] [-r] [-e <end>] [-i <N>]
 bud f e <counter> [BUDGET] [-d <desc>] [-v <amount>] [-c <category>] [-t <tags>] [-r] [-e <end>]
 bud f d <id-or-counter> [BUDGET] [-y]
@@ -304,6 +308,8 @@ Key options for `create`:
 ```
 bud r l [MONTH]                   # list recurrences active in MONTH (defaults to current month)
 bud r l -a                        # list ALL recurrences in the project
+bud r l -t fixo                   # list only recurrences tagged "fixo"
+bud r l -t fixo,moradia           # list recurrences with BOTH tags (AND logic)
 bud r e <counter> [-a] [-d <desc>] [-v <amount>] [-c <category>] [-t <tags>] [--propagate]
 bud r d <id-or-counter> [-a] [-c] [-y]
 ```

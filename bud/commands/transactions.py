@@ -22,7 +22,8 @@ def transaction():
 @click.argument("month", default=None, required=False)
 @click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 @click.option("--show-id", "-s", is_flag=True, default=False, help="Show transaction UUIDs")
-def list_transactions(month, project_id, show_id):
+@click.option("--tags", "-t", "filter_tags", default=None, help="Filter by tags (comma-separated, AND logic)")
+def list_transactions(month, project_id, show_id, filter_tags):
     """List transactions for a given month."""
     async def _run():
         async with get_session() as db:
@@ -33,6 +34,9 @@ def list_transactions(month, project_id, show_id):
             from bud.commands.utils import require_month
             m = require_month(month)
             items = await transaction_service.list_transactions(db, pid, m)
+            if filter_tags:
+                required = [t.strip() for t in filter_tags.split(",")]
+                items = [t for t in items if t.tags and all(tag in t.tags for tag in required)]
             if not items:
                 click.echo("no transactions found.")
                 return
