@@ -1,4 +1,4 @@
-.PHONY: venv setup build test watch lint clean
+.PHONY: venv setup build test watch lint clean auto-update-install auto-update-uninstall auto-update-status
 
 PYTHON := python3
 UV := uv
@@ -38,3 +38,23 @@ up:
 
 down:
 	docker compose down
+
+auto-update-install:
+	mkdir -p $(HOME)/.config/systemd/user
+	cp scripts/bud-auto-update.service $(HOME)/.config/systemd/user/
+	cp scripts/bud-auto-update.timer $(HOME)/.config/systemd/user/
+	systemctl --user daemon-reload
+	systemctl --user enable --now bud-auto-update.timer
+	@echo "auto-update timer installed and started"
+
+auto-update-uninstall:
+	systemctl --user disable --now bud-auto-update.timer || true
+	rm -f $(HOME)/.config/systemd/user/bud-auto-update.service
+	rm -f $(HOME)/.config/systemd/user/bud-auto-update.timer
+	systemctl --user daemon-reload
+	@echo "auto-update timer removed"
+
+auto-update-status:
+	systemctl --user status bud-auto-update.timer
+	@echo "---"
+	systemctl --user list-timers bud-auto-update.timer

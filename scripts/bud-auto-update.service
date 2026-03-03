@@ -1,0 +1,11 @@
+[Unit]
+Description=Auto-update bud from remote main branch
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/bud/scripts/auto-update.sh
+Environment=BUD_REPO_DIR=%h/bud
+Environment=BUD_BRANCH=main
+Environment=BUD_POST_UPDATE_CMD=uv sync
