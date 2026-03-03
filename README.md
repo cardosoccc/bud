@@ -217,7 +217,7 @@ Additionally, `project set-default` has alias `s` and `config set` has alias `s`
 | `bud rr [MONTH]` | `bud r l` |
 | `bud gg` | `bud g l` |
 
-**Option aliases** — most options have single-letter shortcuts (`-v` for `--value`, `-d` for `--description`, `-p` for `--project`, `-c` for `--category`, `-t` for `--tags` or `--date`, `-a` for `--account`, `-s` for `--show-id`, etc.). Run any command with `--help` to see available shortcuts.
+**Option aliases** — most options have single-letter shortcuts (`-v` for `--value`, `-d` for `--description`, `-p` for `--project`, `-c` for `--category`, `-t` for `--tags` or `--date`, `-a` for `--account`, `-s` for `--show-id`, `-f` for `--filter` or `--forecast`, etc.). In list/edit/delete commands, `-f` accepts a filter DSL expression (see **Filtering** below). Run any command with `--help` to see available shortcuts.
 
 ### Global Options
 
@@ -254,6 +254,8 @@ bud a d <id-or-name>                                   # delete account (blocked
 
 ```
 bud t l [MONTH]                   # list transactions (MONTH = YYYY-MM, defaults to active month)
+bud t l -f "t=fixo"               # list only transactions tagged "fixo"
+bud t l -f "t=fixo,moradia;c=outros" # filter by tags AND category
 bud t s <transaction-id>          # show full transaction details
 bud t c -v <amount> -d <desc> -a <account> [-t <date>] [-c <category>] [--tags <tag1,tag2>]
 bud t c -f <forecast #> -a <account> [-t <date>] [-v <amount>] [-d <desc>] [-c <category>] [--tags <tag1,tag2>]
@@ -284,6 +286,8 @@ bud b d <id-or-month-or-counter> [-y]  # delete a budget (cascades to forecasts)
 
 ```
 bud f l [BUDGET]                  # list forecasts (BUDGET = UUID or YYYY-MM, defaults to current month)
+bud f l -f "t=fixo"               # list only forecasts tagged "fixo"
+bud f l -f "t=fixo,moradia;v<0"   # filter by tags AND value
 bud f c [BUDGET] -v <amount> [-d <desc>] [-c <category>] [-t <tags>] [-r] [-e <end>] [-i <N>]
 bud f e <counter> [BUDGET] [-d <desc>] [-v <amount>] [-c <category>] [-t <tags>] [-r] [-e <end>]
 bud f d <id-or-counter> [BUDGET] [-y]
@@ -304,6 +308,8 @@ Key options for `create`:
 ```
 bud r l [MONTH]                   # list recurrences active in MONTH (defaults to current month)
 bud r l -a                        # list ALL recurrences in the project
+bud r l -f "t=fixo"               # list only recurrences tagged "fixo"
+bud r l -a -f "t=fixo;c=moradia" # filter all recurrences by tags and category
 bud r e <counter> [-a] [-d <desc>] [-v <amount>] [-c <category>] [-t <tags>] [--propagate]
 bud r d <id-or-counter> [-a] [-c] [-y]
 ```
@@ -370,6 +376,67 @@ Common config keys:
 bud g s month 2025-03                   # set the active month
 bud g s bucket s3://my-bucket/bud       # set cloud sync bucket
 bud g s bucket gs://my-bucket/bud
+```
+
+---
+
+## Filtering
+
+The `-f` / `--filter` option is available on `list`, `edit`, and `delete` subcommands for transactions, forecasts, and recurrences. It accepts a **filter DSL expression** that selects only matching records.
+
+### Syntax
+
+Clauses are separated by **semicolons**. Each clause is `field` `operator` `value`. All clauses combine with **AND** logic.
+
+```
+filter     := clause (";" clause)*
+clause     := field operator value
+field      := "c" | "t" | "v" | "d"
+operator   := "=" | "==" | ">" | "<" | ">=" | "<="
+```
+
+### Fields
+
+| Key | Field | Operators | Semantics |
+|-----|-------|-----------|-----------|
+| `c` | category | `=` | exact match on category name (case-insensitive) |
+| `t` | tags | `=` | comma-separated, AND logic — all listed tags must be present |
+| `v` | value | `=` `>` `<` `>=` `<=` | numeric comparison |
+| `d` | description | `=` (substring), `==` (exact) | text match (case-insensitive) |
+
+### Examples
+
+```bash
+# transactions tagged "fixo"
+bud tt -f "t=fixo"
+
+# transactions with BOTH tags "fixo" and "moradia"
+bud tt -f "t=fixo,moradia"
+
+# expenses in category "outros"
+bud tt -f "c=outros;v<0"
+
+# forecasts matching description substring and value range
+bud ff -f "d=aluguel;v<=-1000"
+
+# all recurrences tagged "fixo" with category "moradia"
+bud r l -a -f "t=fixo;c=moradia"
+
+# combined: category + tags + value + description
+bud tt -f "c=outros;t=fixo,mercado;v>3;d=transfer"
+```
+
+### Filtering in edit and delete
+
+When `-f` is used with `edit` or `delete`, the counter (`#`) refers to the **filtered** list, not the full list:
+
+```bash
+# list only "fixo" transactions
+bud tt -f "t=fixo"
+# edit #2 from that filtered list
+bud t e 2 -f "t=fixo" -v -200
+# delete #1 from that filtered list
+bud t d 1 -f "t=fixo" -y
 ```
 
 ---

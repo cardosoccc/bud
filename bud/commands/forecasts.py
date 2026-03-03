@@ -6,6 +6,7 @@ from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
 from bud.commands.utils import resolve_project_id, resolve_category_id, resolve_budget_id, is_uuid
+from bud.filter import apply_filter
 from bud.schemas.budget import BudgetCreate
 from bud.schemas.category import CategoryCreate
 from bud.schemas.forecast import ForecastCreate, ForecastUpdate
@@ -66,11 +67,24 @@ async def _resolve_or_create_budget_id(db, budget_id, project_id):
     return b.id
 
 
+def _forecast_description(f):
+    """Get the display description for a forecast (uses recurrence base_description if linked)."""
+    return (f.recurrence.base_description if f.recurrence and f.recurrence.base_description else f.description) or ""
+
+
+def _filtered_forecasts(items, filter_expr):
+    """Apply filter DSL to a list of forecasts."""
+    if not filter_expr:
+        return items
+    return apply_filter(items, filter_expr, get_description=_forecast_description)
+
+
 @forecast.command("list")
 @click.argument("budget_id", default=None, required=False)
 @click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 @click.option("--show-id", "-s", is_flag=True, default=False, help="Show forecast UUIDs")
-def list_forecasts(budget_id, project_id, show_id):
+@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (e.g. \"t=fixo;c=outros;v<0\")")
+def list_forecasts(budget_id, project_id, show_id, filter_expr):
     """List all forecasts for a budget. Defaults to the current month's budget."""
     async def _run():
         from bud.commands.utils import require_month
@@ -91,12 +105,13 @@ def list_forecasts(budget_id, project_id, show_id):
                 if not bid:
                     return
             items = await forecast_service.list_forecasts(db, bid)
+            items = _filtered_forecasts(items, filter_expr)
             if not items:
                 click.echo("no forecasts found.")
                 return
 
             def _display_description(f):
-                desc = (f.recurrence.base_description if f.recurrence and f.recurrence.base_description else f.description) or ""
+                desc = _forecast_description(f)
                 if f.installment is not None and f.recurrence and f.recurrence.installments:
                     desc = f"{desc} ({f.installment}/{f.recurrence.installments})".strip()
                 return desc
@@ -298,9 +313,10 @@ def create_forecast(budget_id, description, value, category_id, tags, recurrent,
 @click.option("--tags", "-t", default=None)
 @click.option("--recurrent", "-r", is_flag=True, default=False, help="Turn into a recurrent forecast")
 @click.option("--recurrence-end", "-e", default=None, help="Last month for recurrence (YYYY-MM)")
+@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (counter references filtered list)")
 @click.argument("budget_id", default=None, required=False)
 @click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
-def edit_forecast(counter, record_id, description, value, category_id, tags, recurrent, recurrence_end, budget_id, project_id):
+def edit_forecast(counter, record_id, description, value, category_id, tags, recurrent, recurrence_end, filter_expr, budget_id, project_id):
     """Edit a forecast. Specify by list counter (default) or --id."""
     async def _run():
         tag_list = [t.strip() for t in tags.split(",")] if tags else None
@@ -325,6 +341,7 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, rec
                         return
                     bid = existing.id
                 items = await forecast_service.list_forecasts(db, bid)
+                items = _filtered_forecasts(items, filter_expr)
                 if counter < 1 or counter > len(items):
                     click.echo(f"forecast #{counter} not found in list.", err=True)
                     return
@@ -420,7 +437,8 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, rec
 @click.argument("budget_id", default=None, required=False)
 @click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 @click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
-def delete_forecast(forecast_id, budget_id, project_id, yes):
+@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (counter references filtered list)")
+def delete_forecast(forecast_id, budget_id, project_id, yes, filter_expr):
     """Delete a forecast. FORECAST_ID can be a UUID or list counter (#)."""
     async def _run():
         async with get_session() as db:
@@ -442,6 +460,7 @@ def delete_forecast(forecast_id, budget_id, project_id, yes):
                         return
                     bid = existing.id
                 items = await forecast_service.list_forecasts(db, bid)
+                items = _filtered_forecasts(items, filter_expr)
                 n = int(forecast_id)
                 if n < 1 or n > len(items):
                     click.echo(f"forecast #{n} not found in list.", err=True)

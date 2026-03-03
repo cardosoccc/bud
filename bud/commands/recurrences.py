@@ -5,6 +5,7 @@ from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
 from bud.commands.utils import resolve_project_id, resolve_category_id, is_uuid
+from bud.filter import apply_filter
 from bud.schemas.category import CategoryCreate
 from bud.services import categories as category_service
 from bud.services import recurrences as recurrence_service
@@ -41,18 +42,31 @@ async def _resolve_items(db, project_id, month, show_all):
     return pid, items
 
 
+def _filtered_recurrences(items, filter_expr):
+    """Apply filter DSL to a list of recurrences."""
+    if not filter_expr or not items:
+        return items
+    return apply_filter(
+        items,
+        filter_expr,
+        get_description=lambda r: r.base_description or "",
+    )
+
+
 @recurrence.command("list")
 @click.argument("month", default=None, required=False)
 @click.option("--all", "-a", "show_all", is_flag=True, default=False, help="Show all recurrences")
 @click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 @click.option("--show-id", "-s", is_flag=True, default=False, help="Show recurrence UUIDs")
-def list_recurrences(month, show_all, project_id, show_id):
+@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (e.g. \"t=fixo;c=outros;v<0\")")
+def list_recurrences(month, show_all, project_id, show_id, filter_expr):
     """List recurrences. Defaults to those active in the current month."""
     async def _run():
         async with get_session() as db:
             pid, items = await _resolve_items(db, project_id, month, show_all)
             if pid is None:
                 return
+            items = _filtered_recurrences(items, filter_expr)
             if not items:
                 click.echo("no recurrences found.")
                 return
@@ -91,11 +105,12 @@ def list_recurrences(month, show_all, project_id, show_id):
 @click.option("--end", "-e", default=None, help="End month (YYYY-MM)")
 @click.option("--installments", "-i", type=int, default=None)
 @click.option("--propagate", is_flag=True, default=False, help="Propagate changes to linked forecasts")
+@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (counter references filtered list)")
 @click.argument("month", default=None, required=False)
 @click.option("--all", "-a", "show_all", is_flag=True, default=False, help="Use counter from full list")
 @click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 def edit_recurrence(counter, record_id, description, value, category_id, tags,
-                    start, end, installments, propagate, month, show_all, project_id):
+                    start, end, installments, propagate, filter_expr, month, show_all, project_id):
     """Edit a recurrence. Specify by list counter (default) or --id."""
     async def _run():
         from decimal import Decimal
@@ -108,7 +123,8 @@ def edit_recurrence(counter, record_id, description, value, category_id, tags,
                 pid, items = await _resolve_items(db, project_id, month, show_all)
                 if pid is None:
                     return
-                if counter < 1 or counter > len(items):
+                items = _filtered_recurrences(items, filter_expr)
+                if not items or counter < 1 or counter > len(items):
                     click.echo(f"recurrence #{counter} not found in list.", err=True)
                     return
                 rid = items[counter - 1].id
@@ -171,7 +187,8 @@ def edit_recurrence(counter, record_id, description, value, category_id, tags,
 @click.option("--cascade", "-c", is_flag=True, default=False, help="Delete all linked forecasts too")
 @click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 @click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
-def delete_recurrence(recurrence_id, month, show_all, cascade, project_id, yes):
+@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (counter references filtered list)")
+def delete_recurrence(recurrence_id, month, show_all, cascade, project_id, yes, filter_expr):
     """Delete a recurrence. RECURRENCE_ID can be a UUID or list counter (#)."""
     async def _run():
         async with get_session() as db:
@@ -179,8 +196,9 @@ def delete_recurrence(recurrence_id, month, show_all, cascade, project_id, yes):
                 pid, items = await _resolve_items(db, project_id, month, show_all)
                 if pid is None:
                     return
+                items = _filtered_recurrences(items, filter_expr)
                 n = int(recurrence_id)
-                if n < 1 or n > len(items):
+                if not items or n < 1 or n > len(items):
                     click.echo(f"recurrence #{n} not found in list.", err=True)
                     return
                 r = items[n - 1]
