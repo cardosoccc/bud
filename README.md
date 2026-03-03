@@ -256,11 +256,16 @@ bud a d <id-or-name>                                   # delete account (blocked
 bud t l [MONTH]                   # list transactions (MONTH = YYYY-MM, defaults to active month)
 bud t s <transaction-id>          # show full transaction details
 bud t c -v <amount> -d <desc> -a <account> [-t <date>] [-c <category>] [--tags <tag1,tag2>]
+bud t c -f <forecast #> -a <account> [-t <date>] [-v <amount>] [-d <desc>] [-c <category>] [--tags <tag1,tag2>]
 bud t e <counter> [MONTH] [-v <amount>] [-d <desc>] [-t <date>] [-c <category>] [--tags <tag1,tag2>]
 bud t d <id-or-counter> [MONTH] [-y]
 ```
 
 The `MONTH` argument is positional (e.g. `bud t l 2025-03`). When using a list counter for edit/delete, the month scopes which list the counter refers to.
+
+**Creating from a forecast** (`-f` / `--forecast`):
+
+Use `-f <forecast #>` to create a transaction pre-filled with the forecast's value, description, category, and tags. The forecast counter refers to the `#` column from `bud ff` for the month matching the transaction date (defaults to today). Only `-a` (account) is required; all other fields are inherited from the forecast but can be overridden with explicit options.
 
 ---
 

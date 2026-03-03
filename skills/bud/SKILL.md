@@ -49,7 +49,7 @@ comandos de duas letras listam um recurso diretamente: `tt` (transacoes), `ff` (
 
 ### aliases de opcoes comuns
 
-`-v` valor, `-d` descricao, `-p` projeto, `-c` categoria, `-t` tags (ou data em transacoes), `-a` conta (ou --all em recorrencias), `-s` mostrar-id, `-n` nome, `-y` sim (pular confirmacao), `-r` recorrente, `-e` fim-recorrencia, `-i` parcelas.
+`-v` valor, `-d` descricao, `-p` projeto, `-c` categoria, `-t` tags (ou data em transacoes), `-a` conta (ou --all em recorrencias), `-s` mostrar-id, `-n` nome, `-y` sim (pular confirmacao), `-r` recorrente, `-e` fim-recorrencia, `-i` parcelas, `-f` previsao (criar transacao a partir de previsao).
 
 ## fluxo de configuracao
 
@@ -76,6 +76,15 @@ bud t c -v 3000 -d "salario" -a banco -c salario
 # compra no cartao de credito
 bud t c -v -100 -d "restaurante" -a cartao -c alimentacao
 
+# criar transacao a partir de previsao (herda valor, descricao, categoria e tags)
+bud t c -f 3 -a banco
+
+# criar transacao a partir de previsao com valor diferente
+bud t c -f 3 -a banco -v -120
+
+# criar transacao a partir de previsao em data especifica
+bud t c -f 3 -a banco -t 2025-03-15
+
 # listar transacoes do mes atual
 bud tt
 
@@ -88,6 +97,10 @@ bud t e 3 -v -45 -d "mercado (corrigido)"
 # excluir transacao #2 (sem confirmacao)
 bud t d 2 -y
 ```
+
+### transacoes a partir de previsoes
+
+use `-f <numero>` para criar transacoes a partir de previsoes existentes. o numero corresponde a coluna `#` da listagem de previsoes (`bud ff`) do mes correspondente a data da transacao. o comando herda valor, descricao, categoria e tags da previsao. apenas `-a` (conta) e obrigatorio; todos os outros campos podem ser sobrescritos com opcoes explicitas.
 
 ## orcamentos e previsoes
 

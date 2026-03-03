@@ -75,18 +75,25 @@ def show_transaction(transaction_id):
 
 
 @transaction.command("create")
-@click.option("--value", "-v", required=True, type=float, help="Amount (positive = income, negative = expense)")
-@click.option("--description", "-d", required=True)
+@click.option("--value", "-v", type=float, default=None, help="Amount (positive = income, negative = expense)")
+@click.option("--description", "-d", default=None)
 @click.option("--date", "-t", "txn_date", default=None, help="YYYY-MM-DD (default: today)")
 @click.option("--account", "-a", "account_id", required=True, help="Account UUID or name")
 @click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 @click.option("--category", "-c", "category_id", default=None, help="Category UUID or name")
 @click.option("--tags", default=None, help="Comma-separated tags")
-def create_transaction(value, description, txn_date, account_id, project_id, category_id, tags):
-    """Create a new transaction. Use positive values for income and negative for expenses."""
+@click.option("--forecast", "-f", "forecast_counter", type=int, default=None,
+              help="Create from forecast # (uses forecast value, description, category, tags)")
+def create_transaction(value, description, txn_date, account_id, project_id, category_id, tags, forecast_counter):
+    """Create a new transaction. Use positive values for income and negative for expenses.
+
+    Use -f to create from a forecast: bud t c -f <forecast #> -a <account>
+    The forecast counter refers to the # column from the forecast list of the month
+    matching the transaction date.
+    """
     async def _run():
         d = date_type.fromisoformat(txn_date) if txn_date else date_type.today()
-        tag_list = [t.strip() for t in tags.split(",")] if tags else []
+        tag_list = [t.strip() for t in tags.split(",")] if tags else None
 
         async with get_session() as db:
             pid = await resolve_project_id(db, project_id)
@@ -99,30 +106,72 @@ def create_transaction(value, description, txn_date, account_id, project_id, cat
                 click.echo(f"account not found: {account_id}", err=True)
                 return
 
+            # Resolve forecast if -f is used
+            f_value = value
+            f_description = description
+            f_category_id = category_id
+            f_tag_list = tag_list
+
+            if forecast_counter is not None:
+                from bud.services import forecasts as forecast_service
+                from bud.services import budgets as budget_service
+
+                month = d.strftime("%Y-%m")
+                budget_obj = await budget_service.get_budget_by_name(db, pid, month)
+                if not budget_obj:
+                    click.echo(f"error: no budget found for {month}. create one with `bud b c {month}`.", err=True)
+                    return
+
+                forecasts = await forecast_service.list_forecasts(db, budget_obj.id)
+                if forecast_counter < 1 or forecast_counter > len(forecasts):
+                    click.echo(f"forecast #{forecast_counter} not found in list.", err=True)
+                    return
+
+                fc = forecasts[forecast_counter - 1]
+                fc_description = (fc.recurrence.base_description if fc.recurrence and fc.recurrence.base_description else fc.description) or ""
+
+                if f_value is None:
+                    f_value = float(fc.value)
+                if f_description is None:
+                    f_description = fc_description
+                if f_category_id is None and fc.category_id:
+                    f_category_id = str(fc.category_id)
+                if f_tag_list is None and fc.tags:
+                    f_tag_list = list(fc.tags)
+
+            if f_value is None:
+                click.echo("error: --value is required (or use --forecast to inherit from a forecast).", err=True)
+                return
+            if f_description is None:
+                click.echo("error: --description is required (or use --forecast to inherit from a forecast).", err=True)
+                return
+            if f_tag_list is None:
+                f_tag_list = []
+
             cat = None
-            if category_id:
-                cat = await resolve_category_id(db, category_id)
+            if f_category_id:
+                cat = await resolve_category_id(db, f_category_id)
                 if not cat:
-                    if is_uuid(category_id):
-                        click.echo(f"category not found: {category_id}", err=True)
+                    if is_uuid(f_category_id):
+                        click.echo(f"category not found: {f_category_id}", err=True)
                         return
-                    if click.confirm(f"category '{category_id}' not found. create it?", default=False):
+                    if click.confirm(f"category '{f_category_id}' not found. create it?", default=False):
                         from bud.schemas.category import CategoryCreate
                         from bud.services import categories as category_service
-                        new_cat = await category_service.create_category(db, CategoryCreate(name=category_id))
+                        new_cat = await category_service.create_category(db, CategoryCreate(name=f_category_id))
                         cat = new_cat.id
                         click.echo(f"created category: {new_cat.name}")
                     else:
                         return
 
             t = await transaction_service.create_transaction(db, TransactionCreate(
-                value=value,
-                description=description,
+                value=f_value,
+                description=f_description,
                 date=d,
                 account_id=acc,
                 project_id=pid,
                 category_id=cat,
-                tags=tag_list,
+                tags=f_tag_list,
             ))
             click.echo(f"created transaction: {t.description} ({t.value}) id: {t.id}")
 
