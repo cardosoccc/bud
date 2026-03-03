@@ -4,11 +4,12 @@ Grammar (Option A — semicolon-separated):
 
     filter     := clause (";" clause)*
     clause     := field operator value
-    field      := "c" | "t" | "v" | "d"
+    field      := "a" | "c" | "t" | "v" | "d"
     operator   := "==" | ">=" | "<=" | "=" | ">" | "<"
     value      := <text>
 
 Semantics:
+    a  — account name, exact match (case-insensitive)
     c  — category name, exact match (case-insensitive)
     t  — tags, comma-separated, AND logic (all must be present)
     d  — description: "=" substring (case-insensitive), "==" exact (case-insensitive)
@@ -17,7 +18,7 @@ Semantics:
 All clauses are combined with AND logic.
 
 Examples:
-    "c=outros;t=fixo,mercado;v>3;d=transfer"
+    "a=bb;c=outros;t=fixo,mercado;v>3;d=transfer"
 """
 
 import re
@@ -33,7 +34,7 @@ class FilterClause:
     value: str
 
 
-_CLAUSE_RE = re.compile(r"^([ctdv])(==|>=|<=|=|>|<)(.+)$")
+_CLAUSE_RE = re.compile(r"^([actdv])(==|>=|<=|=|>|<)(.+)$")
 
 
 def parse_filter(expr: str) -> List[FilterClause]:
@@ -55,16 +56,17 @@ def apply_filter(
     expr: str,
     get_category: Callable = lambda r: r.category.name if r.category else "",
     get_description: Callable = lambda r: r.description or "",
+    get_account: Callable = lambda r: r.account.name if getattr(r, "account", None) else "",
 ) -> list:
     """Filter items using a DSL expression. Returns the filtered list.
 
-    get_category and get_description are callables that extract the
-    category name and description from each record, allowing callers
-    to customise for models that store these differently (e.g. forecasts
-    use recurrence.base_description).
+    get_category, get_description and get_account are callables that
+    extract the category name, description and account name from each
+    record, allowing callers to customise for models that store these
+    differently (e.g. forecasts use recurrence.base_description).
     """
     clauses = parse_filter(expr)
-    return [item for item in items if _matches(item, clauses, get_category, get_description)]
+    return [item for item in items if _matches(item, clauses, get_category, get_description, get_account)]
 
 
 def _matches(
@@ -72,9 +74,15 @@ def _matches(
     clauses: List[FilterClause],
     get_category: Callable,
     get_description: Callable,
+    get_account: Callable,
 ) -> bool:
     for clause in clauses:
-        if clause.field == "t":
+        if clause.field == "a":
+            acct = get_account(record)
+            if acct.lower() != clause.value.lower():
+                return False
+
+        elif clause.field == "t":
             required = [t.strip() for t in clause.value.split(",")]
             tags = record.tags or []
             if not all(tag in tags for tag in required):

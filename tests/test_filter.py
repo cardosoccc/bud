@@ -61,11 +61,17 @@ def test_parse_invalid_no_operator_raises():
 
 
 @dataclass
+class FakeAccount:
+    name: str = ""
+
+
+@dataclass
 class FakeRecord:
     description: str = ""
     value: Decimal = Decimal("0")
     tags: List[str] = field(default_factory=list)
     category: Optional[object] = None
+    account: Optional[FakeAccount] = None
 
 
 @dataclass
@@ -73,13 +79,15 @@ class FakeCategory:
     name: str = ""
 
 
-def _make(desc="", value=0, tags=None, cat_name=""):
+def _make(desc="", value=0, tags=None, cat_name="", acct_name=""):
     cat = FakeCategory(name=cat_name) if cat_name else None
+    acct = FakeAccount(name=acct_name) if acct_name else None
     return FakeRecord(
         description=desc,
         value=Decimal(str(value)),
         tags=tags or [],
         category=cat,
+        account=acct,
     )
 
 
@@ -223,3 +231,62 @@ def test_invalid_numeric_value_raises():
     items = [_make(value=100)]
     with pytest.raises(ValueError, match="invalid numeric value"):
         apply_filter(items, "v>abc")
+
+
+# --- account filter tests ---
+
+
+def test_parse_account_clause():
+    clauses = parse_filter("a=bb")
+    assert len(clauses) == 1
+    assert clauses[0] == FilterClause(field="a", operator="=", value="bb")
+
+
+def test_filter_by_account():
+    items = [_make(acct_name="bb"), _make(acct_name="nubank"), _make(acct_name="bb")]
+    result = apply_filter(items, "a=bb")
+    assert len(result) == 2
+
+
+def test_filter_by_account_case_insensitive():
+    items = [_make(acct_name="BB"), _make(acct_name="Nubank")]
+    result = apply_filter(items, "a=bb")
+    assert len(result) == 1
+
+
+def test_filter_by_account_no_match():
+    items = [_make(acct_name="nubank")]
+    result = apply_filter(items, "a=bb")
+    assert len(result) == 0
+
+
+def test_filter_by_account_none():
+    items = [_make()]  # no account
+    result = apply_filter(items, "a=bb")
+    assert len(result) == 0
+
+
+def test_filter_by_account_combined():
+    items = [
+        _make(desc="aluguel", value=-1500, acct_name="bb", cat_name="moradia"),
+        _make(desc="mercado", value=-200, acct_name="nubank", cat_name="outros"),
+        _make(desc="salário", value=5000, acct_name="bb", cat_name="rendimentos"),
+    ]
+    result = apply_filter(items, "a=bb;v<0")
+    assert len(result) == 1
+    assert result[0].description == "aluguel"
+
+
+def test_filter_by_account_no_attr():
+    """Records without an account attribute (e.g. forecasts) are excluded."""
+
+    @dataclass
+    class NoAccountRecord:
+        description: str = ""
+        value: Decimal = Decimal("0")
+        tags: List[str] = field(default_factory=list)
+        category: Optional[object] = None
+
+    items = [NoAccountRecord(description="rent", value=Decimal("-100"))]
+    result = apply_filter(items, "a=bb")
+    assert len(result) == 0

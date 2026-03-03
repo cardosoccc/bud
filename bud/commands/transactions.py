@@ -30,7 +30,7 @@ def _filtered_transactions(items, filter_expr):
 @click.argument("month", default=None, required=False)
 @click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 @click.option("--show-id", "-s", is_flag=True, default=False, help="Show transaction UUIDs")
-@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (e.g. \"t=fixo;c=outros;v<0\")")
+@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (e.g. \"a=bb;t=fixo;c=outros;v<0\")")
 def list_transactions(month, project_id, show_id, filter_expr):
     """List transactions for a given month."""
     async def _run():

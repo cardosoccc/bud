@@ -58,7 +58,7 @@ def _filtered_recurrences(items, filter_expr):
 @click.option("--all", "-a", "show_all", is_flag=True, default=False, help="Show all recurrences")
 @click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 @click.option("--show-id", "-s", is_flag=True, default=False, help="Show recurrence UUIDs")
-@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (e.g. \"t=fixo;c=outros;v<0\")")
+@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (e.g. \"a=bb;t=fixo;c=outros;v<0\")")
 def list_recurrences(month, show_all, project_id, show_id, filter_expr):
     """List recurrences. Defaults to those active in the current month."""
     async def _run():
