@@ -37,9 +37,13 @@ from bud.models.account import AccountType
 from bud.schemas.account import AccountCreate
 from bud.schemas.category import CategoryCreate
 from bud.schemas.project import ProjectCreate
+from bud.schemas.budget import BudgetCreate
+from bud.schemas.forecast import ForecastCreate
 from bud.schemas.transaction import TransactionCreate
 from bud.services import accounts as account_service
+from bud.services import budgets as budget_service
 from bud.services import categories as category_service
+from bud.services import forecasts as forecast_service
 from bud.services import projects as project_service
 from bud.services import transactions as transaction_service
 
@@ -758,25 +762,33 @@ def test_create_account_not_found_shows_error(runner, cli_db):
 
 
 def test_create_missing_value_fails(runner, cli_db):
-    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
+    pid, _ = asyncio.run(_seed_project(cli_db, "proj"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Bank"))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
         result = runner.invoke(transaction, [
             "create",
             "--description", "MissingValue",
-            "--account", str(uuid.uuid4()),
+            "--account", "Bank",
         ])
 
-    assert result.exit_code != 0
+    assert "error: --value is required" in result.output
 
 
 def test_create_missing_description_fails(runner, cli_db):
-    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)):
+    pid, _ = asyncio.run(_seed_project(cli_db, "proj"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Bank"))
+
+    with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
         result = runner.invoke(transaction, [
             "create",
             "--value", "-50.00",
-            "--account", str(uuid.uuid4()),
+            "--account", "Bank",
         ])
 
-    assert result.exit_code != 0
+    assert "error: --description is required" in result.output
 
 
 def test_create_missing_account_fails(runner, cli_db):
@@ -1268,3 +1280,212 @@ def test_txns_shortcut_uses_default_month(runner, cli_db):
 
     assert result.exit_code == 0
     assert "DefaultMonthTx" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Helpers for forecast-based transaction creation
+# ---------------------------------------------------------------------------
+
+async def _seed_budget(db_url, project_id, month="2025-01"):
+    engine = create_async_engine(db_url, echo=False)
+    Session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with Session() as session:
+        b = await budget_service.create_budget(session, BudgetCreate(name=month, project_id=project_id))
+        result = (b.id, b.name)
+    await engine.dispose()
+    return result
+
+
+async def _seed_forecast(db_url, budget_id, *, value=-100, description=None, category_id=None, tags=None):
+    engine = create_async_engine(db_url, echo=False)
+    Session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    async with Session() as session:
+        f = await forecast_service.create_forecast(
+            session,
+            ForecastCreate(
+                description=description,
+                value=Decimal(str(value)),
+                budget_id=budget_id,
+                category_id=category_id,
+                tags=tags or [],
+            ),
+        )
+        result = f.id
+    await engine.dispose()
+    return result
+
+
+# ---------------------------------------------------------------------------
+# transaction create --forecast (-f)
+# ---------------------------------------------------------------------------
+
+class TestCreateFromForecast:
+    def test_create_from_forecast_inherits_all_fields(self, runner, cli_db):
+        """Creating a transaction with -f should inherit value, description, category, tags."""
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj"))
+        aid, _ = asyncio.run(_seed_account(cli_db, pid, "Bank"))
+        cat_id, _ = asyncio.run(_seed_category(cli_db, "Food"))
+        bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+        asyncio.run(_seed_forecast(cli_db, bid, value=-200, description="Groceries", category_id=cat_id, tags=["weekly"]))
+
+        with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+             patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+            result = runner.invoke(transaction, [
+                "create", "-f", "1", "-a", "Bank", "--date", "2025-01-15",
+            ])
+
+        assert result.exit_code == 0
+        assert "created transaction" in result.output
+        assert "Groceries" in result.output
+        assert "-200" in result.output
+
+    def test_create_from_forecast_allows_value_override(self, runner, cli_db):
+        """User can override the value inherited from the forecast."""
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj"))
+        aid, _ = asyncio.run(_seed_account(cli_db, pid, "Bank"))
+        bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+        asyncio.run(_seed_forecast(cli_db, bid, value=-200, description="Groceries"))
+
+        with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+             patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+            result = runner.invoke(transaction, [
+                "create", "-f", "1", "-a", "Bank", "--date", "2025-01-15",
+                "-v", "-150",
+            ])
+
+        assert result.exit_code == 0
+        assert "created transaction" in result.output
+        assert "-150" in result.output
+
+    def test_create_from_forecast_allows_description_override(self, runner, cli_db):
+        """User can override the description inherited from the forecast."""
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj"))
+        aid, _ = asyncio.run(_seed_account(cli_db, pid, "Bank"))
+        bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+        asyncio.run(_seed_forecast(cli_db, bid, value=-200, description="Groceries"))
+
+        with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+             patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+            result = runner.invoke(transaction, [
+                "create", "-f", "1", "-a", "Bank", "--date", "2025-01-15",
+                "-d", "Custom description",
+            ])
+
+        assert result.exit_code == 0
+        assert "created transaction" in result.output
+        assert "Custom description" in result.output
+
+    def test_create_from_forecast_invalid_counter(self, runner, cli_db):
+        """Using a forecast counter that doesn't exist should show an error."""
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj"))
+        aid, _ = asyncio.run(_seed_account(cli_db, pid, "Bank"))
+        bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+        asyncio.run(_seed_forecast(cli_db, bid, value=-100, description="Only one"))
+
+        with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+             patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+            result = runner.invoke(transaction, [
+                "create", "-f", "5", "-a", "Bank", "--date", "2025-01-15",
+            ])
+
+        assert result.exit_code == 0
+        assert "forecast #5 not found" in result.output
+
+    def test_create_from_forecast_no_budget(self, runner, cli_db):
+        """Using -f when no budget exists for the month should show an error."""
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj"))
+        aid, _ = asyncio.run(_seed_account(cli_db, pid, "Bank"))
+
+        with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+             patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+            result = runner.invoke(transaction, [
+                "create", "-f", "1", "-a", "Bank", "--date", "2025-01-15",
+            ])
+
+        assert result.exit_code == 0
+        assert "no budget found" in result.output
+
+    def test_create_from_forecast_uses_date_month(self, runner, cli_db):
+        """The forecast counter should resolve from the budget matching the transaction date."""
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj"))
+        aid, _ = asyncio.run(_seed_account(cli_db, pid, "Bank"))
+        # Create budgets for two months with different forecasts
+        bid_jan, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+        bid_feb, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-02"))
+        asyncio.run(_seed_forecast(cli_db, bid_jan, value=-100, description="January forecast"))
+        asyncio.run(_seed_forecast(cli_db, bid_feb, value=-200, description="February forecast"))
+
+        with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+             patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+            result = runner.invoke(transaction, [
+                "create", "-f", "1", "-a", "Bank", "--date", "2025-02-10",
+            ])
+
+        assert result.exit_code == 0
+        assert "February forecast" in result.output
+        assert "-200" in result.output
+
+    def test_create_from_forecast_second_item(self, runner, cli_db):
+        """Using -f 2 should pick the second forecast in the list."""
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj"))
+        aid, _ = asyncio.run(_seed_account(cli_db, pid, "Bank"))
+        bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+        asyncio.run(_seed_forecast(cli_db, bid, value=-100, description="First"))
+        asyncio.run(_seed_forecast(cli_db, bid, value=-250, description="Second"))
+
+        with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+             patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+            result = runner.invoke(transaction, [
+                "create", "-f", "2", "-a", "Bank", "--date", "2025-01-20",
+            ])
+
+        assert result.exit_code == 0
+        assert "Second" in result.output
+        assert "-250" in result.output
+
+    def test_create_from_forecast_defaults_to_today(self, runner, cli_db):
+        """When no --date is given, the transaction date defaults to today and forecasts resolve from today's month."""
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj"))
+        aid, _ = asyncio.run(_seed_account(cli_db, pid, "Bank"))
+        today = date.today()
+        month = today.strftime("%Y-%m")
+        bid, _ = asyncio.run(_seed_budget(cli_db, pid, month))
+        asyncio.run(_seed_forecast(cli_db, bid, value=-75, description="Today forecast"))
+
+        with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+             patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+            result = runner.invoke(transaction, [
+                "create", "-f", "1", "-a", "Bank",
+            ])
+
+        assert result.exit_code == 0
+        assert "created transaction" in result.output
+        assert "Today forecast" in result.output
+
+    def test_create_without_value_or_forecast_shows_error(self, runner, cli_db):
+        """Without --value and without --forecast, the command should fail."""
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj"))
+        aid, _ = asyncio.run(_seed_account(cli_db, pid, "Bank"))
+
+        with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+             patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+            result = runner.invoke(transaction, [
+                "create", "-a", "Bank", "-d", "Test",
+            ])
+
+        assert result.exit_code == 0
+        assert "error: --value is required" in result.output
+
+    def test_create_without_description_or_forecast_shows_error(self, runner, cli_db):
+        """Without --description and without --forecast, the command should fail."""
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj"))
+        aid, _ = asyncio.run(_seed_account(cli_db, pid, "Bank"))
+
+        with patch("bud.commands.transactions.get_session", new=_make_get_session(cli_db)), \
+             patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+            result = runner.invoke(transaction, [
+                "create", "-a", "Bank", "-v", "-50",
+            ])
+
+        assert result.exit_code == 0
+        assert "error: --description is required" in result.output
