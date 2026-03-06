@@ -284,6 +284,7 @@ bud db reset      # destruir + reinicializar
 - caso o usuário crie novas contas ou exclua, atualize essa seção;
 
 - transferências devem ter categoria e tag "transferências" e a descrição deve ser "transferência origem->destino";
+- transferências internas entre contas devem sempre ser registradas nas duas contas envolvidas: uma transação negativa na conta de origem e uma transação positiva na conta de destino, ambas com o mesmo valor absoluto;
 
 - as transações são armazenadas nestas categorias:
 
