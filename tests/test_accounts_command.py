@@ -176,8 +176,8 @@ def test_list_shows_table_headers(runner, cli_db):
     assert result.exit_code == 0
     assert "id" not in result.output.split("\n")[0]
     assert "name" in result.output
-    assert "type" in result.output
-    assert "initial balance" in result.output
+    assert "type" not in result.output.split("\n")[0]
+    assert "initial balance" not in result.output
     assert "current balance" in result.output
 
 
@@ -222,7 +222,7 @@ def test_list_sorted_by_name(runner, cli_db):
     assert pos_alpha < pos_mango < pos_zebra
 
 
-def test_list_shows_account_type(runner, cli_db):
+def test_list_hides_account_type_by_default(runner, cli_db):
     pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
     asyncio.run(_seed_account(cli_db, pid, "CreditCard", AccountType.credit))
 
@@ -230,7 +230,8 @@ def test_list_shows_account_type(runner, cli_db):
          patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
         result = runner.invoke(account, ["list"])
 
-    assert "credit" in result.output
+    assert result.exit_code == 0
+    assert "credit" not in result.output
 
 
 def test_list_by_project_name(runner, cli_db):
@@ -263,6 +264,102 @@ def test_list_no_project_shows_error(runner, cli_db):
     assert result.exit_code == 0
     assert "error" in result.stderr
     assert "no project specified" in result.stderr
+
+
+def test_list_shows_type_with_flag(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    asyncio.run(_seed_account(cli_db, pid, "CreditCard", AccountType.credit))
+
+    with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(account, ["list", "--type"])
+
+    assert result.exit_code == 0
+    assert "type" in result.output.split("\n")[0]
+    assert "credit" in result.output
+
+
+def test_list_shows_initial_balance_with_flag(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    asyncio.run(_seed_account(cli_db, pid, "Savings", initial_balance=500.0))
+
+    with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(account, ["list", "--initial-balance"])
+
+    assert result.exit_code == 0
+    assert "initial balance" in result.output
+    assert "500.00" in result.output
+
+
+def test_list_hides_initial_balance_by_default(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    asyncio.run(_seed_account(cli_db, pid, "Savings", initial_balance=500.0))
+
+    with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(account, ["list"])
+
+    assert result.exit_code == 0
+    assert "initial balance" not in result.output
+
+
+def test_list_shows_both_type_and_initial_balance(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    asyncio.run(_seed_account(cli_db, pid, "Full", AccountType.credit, initial_balance=100.0))
+
+    with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(account, ["list", "--type", "--initial-balance"])
+
+    assert result.exit_code == 0
+    assert "type" in result.output.split("\n")[0]
+    assert "initial balance" in result.output
+    assert "credit" in result.output
+    assert "100.00" in result.output
+
+
+def test_list_shows_all_optional_columns(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    aid, _ = asyncio.run(_seed_account(cli_db, pid, "Everything", AccountType.debit, initial_balance=250.0))
+
+    with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(account, ["list", "--show-id", "--type", "--initial-balance"])
+
+    assert result.exit_code == 0
+    header_line = result.output.split("\n")[0]
+    assert "id" in header_line
+    assert "type" in header_line
+    assert "initial balance" in result.output
+    assert str(aid) in result.output
+    assert "debit" in result.output
+    assert "250.00" in result.output
+
+
+def test_list_type_short_flag(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    asyncio.run(_seed_account(cli_db, pid, "ShortFlag", AccountType.credit))
+
+    with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(account, ["list", "-t"])
+
+    assert result.exit_code == 0
+    assert "credit" in result.output
+
+
+def test_list_initial_balance_short_flag(runner, cli_db):
+    pid, _ = asyncio.run(_seed_project(cli_db, "MyProject"))
+    asyncio.run(_seed_account(cli_db, pid, "ShortFlag", initial_balance=75.0))
+
+    with patch("bud.commands.accounts.get_session", new=_make_get_session(cli_db)), \
+         patch("bud.commands.utils.get_default_project_id", return_value=str(pid)):
+        result = runner.invoke(account, ["list", "-i"])
+
+    assert result.exit_code == 0
+    assert "initial balance" in result.output
+    assert "75.00" in result.output
 
 
 def test_list_only_shows_project_accounts(runner, cli_db):

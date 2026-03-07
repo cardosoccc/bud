@@ -18,7 +18,9 @@ def account():
 @account.command("list")
 @click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
 @click.option("--show-id", "-s", is_flag=True, default=False, help="Show account UUIDs")
-def list_accounts(project_id, show_id):
+@click.option("--type", "-t", "show_type", is_flag=True, default=False, help="Show account type column")
+@click.option("--initial-balance", "-i", "show_initial_balance", is_flag=True, default=False, help="Show initial balance column")
+def list_accounts(project_id, show_id, show_type, show_initial_balance):
     """List accounts."""
     async def _run():
         async with get_session() as db:
@@ -31,12 +33,27 @@ def list_accounts(project_id, show_id):
                 click.echo("no accounts found.")
                 return
             items = sorted(items, key=lambda a: a.name.lower())
+            headers = ["#"]
             if show_id:
-                rows = [[i + 1, str(a.id), a.name, a.type.value, float(a.initial_balance), float(a.current_balance)] for i, a in enumerate(items)]
-                headers = ["#", "id", "name", "type", "initial balance", "current balance"]
-            else:
-                rows = [[i + 1, a.name, a.type.value, float(a.initial_balance), float(a.current_balance)] for i, a in enumerate(items)]
-                headers = ["#", "name", "type", "initial balance", "current balance"]
+                headers.append("id")
+            headers.append("name")
+            if show_type:
+                headers.append("type")
+            if show_initial_balance:
+                headers.append("initial balance")
+            headers.append("current balance")
+            rows = []
+            for i, a in enumerate(items):
+                row = [i + 1]
+                if show_id:
+                    row.append(str(a.id))
+                row.append(a.name)
+                if show_type:
+                    row.append(a.type.value)
+                if show_initial_balance:
+                    row.append(float(a.initial_balance))
+                row.append(float(a.current_balance))
+                rows.append(row)
             click.echo(tabulate(rows, headers=headers, tablefmt="presto", floatfmt=".2f"))
 
     run_async(_run())
