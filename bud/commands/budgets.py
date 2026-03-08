@@ -10,15 +10,15 @@ from bud.services import budgets as budget_service
 
 @click.group()
 def budget():
-    """Manage budgets."""
+    """manage budgets."""
     pass
 
 
 @budget.command("list")
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
-@click.option("--show-id", "-s", is_flag=True, default=False, help="Show budget UUIDs")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
+@click.option("--show-id", "-s", is_flag=True, default=False, help="show budget uuids")
 def list_budgets(project_id, show_id):
-    """List all budgets for a project."""
+    """list all budgets for a project."""
     async def _run():
         async with get_session() as db:
             pid = await resolve_project_id(db, project_id)
@@ -42,9 +42,9 @@ def list_budgets(project_id, show_id):
 
 @budget.command("create")
 @click.argument("month")
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
 def create_budget(month, project_id):
-    """Create a budget for a month (YYYY-MM)."""
+    """create a budget for a month (yyyy-mm)."""
     async def _run():
         async with get_session() as db:
             pid = await resolve_project_id(db, project_id)
@@ -59,11 +59,11 @@ def create_budget(month, project_id):
 
 @budget.command("edit")
 @click.argument("counter", required=False, type=int, default=None)
-@click.option("--id", "record_id", default=None, help="Budget UUID")
-@click.option("--month", "-m", default=None, help="YYYY-MM")
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
+@click.option("--id", "record_id", default=None, help="budget uuid")
+@click.option("--month", "-m", default=None, help="yyyy-mm")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
 def edit_budget(counter, record_id, month, project_id):
-    """Edit a budget. Specify by list counter (default) or --id."""
+    """edit a budget. specify by list counter (default) or --id."""
     async def _run():
         async with get_session() as db:
             if record_id:
@@ -92,10 +92,10 @@ def edit_budget(counter, record_id, month, project_id):
 
 @budget.command("delete")
 @click.argument("budget_id")
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name (required when BUDGET_ID is a month name or counter)")
-@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name (required when budget_id is a month name or counter)")
+@click.option("--yes", "-y", is_flag=True, default=False, help="skip confirmation prompt")
 def delete_budget(budget_id, project_id, yes):
-    """Delete a budget. BUDGET_ID can be a UUID, month name (YYYY-MM), or list counter (#)."""
+    """delete a budget. budget_id can be a uuid, month name (yyyy-mm), or list counter (#)."""
     async def _run():
         async with get_session() as db:
             if budget_id.isdigit():

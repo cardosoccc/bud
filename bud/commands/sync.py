@@ -33,7 +33,7 @@ def _get_bucket_url() -> str:
     url = get_config_value("bucket")
     if not url:
         click.echo(
-            "Error: no bucket configured. Set one with:\n"
+            "error: no bucket configured. set one with:\n"
             '  bud config set bucket s3://my-bucket/path\n'
             '  bud config set bucket gs://my-bucket/path',
             err=True,
@@ -45,9 +45,9 @@ def _get_bucket_url() -> str:
 def _handle_auth_error(err) -> None:
     """Print a user-friendly authentication error and exit."""
     click.echo(
-        f"Error: {err.provider} authentication failed.\n"
+        f"error: {err.provider} authentication failed.\n"
         f"  {err}\n\n"
-        f"To configure {err.provider} credentials, run:\n"
+        f"to configure {err.provider} credentials, run:\n"
         f"  {err.configure_hint}",
         err=True,
     )
@@ -55,13 +55,13 @@ def _handle_auth_error(err) -> None:
 
 
 @click.command("push")
-@click.option("--force", "-f", is_flag=True, help="Push even if remote has a newer version.")
+@click.option("--force", "-f", is_flag=True, help="push even if remote has a newer version.")
 def push(force: bool) -> None:
-    """Push the local database to cloud storage."""
+    """push the local database to cloud storage."""
     from bud.services.storage import CloudAuthError, get_provider
 
     if not DB_PATH.exists():
-        click.echo("Error: local database does not exist. Run `bud db init` first.", err=True)
+        click.echo("error: local database does not exist. run `bud db init` first.", err=True)
         sys.exit(1)
 
     bucket_url = _get_bucket_url()
@@ -80,8 +80,8 @@ def push(force: bool) -> None:
 
         if remote_version > local_version and not force:
             click.echo(
-                f"Error: remote version ({remote_version}) is newer than local ({local_version}).\n"
-                "Pull the latest version first, or use --force to overwrite.",
+                f"error: remote version ({remote_version}) is newer than local ({local_version}).\n"
+                "pull the latest version first, or use --force to overwrite.",
                 err=True,
             )
             sys.exit(1)
@@ -93,15 +93,15 @@ def push(force: bool) -> None:
         provider.upload_json(new_meta, REMOTE_META_KEY)
         _save_local_meta(new_meta)
 
-        click.echo(f"Pushed database to {bucket_url} (version {new_version}).")
+        click.echo(f"pushed database to {bucket_url} (version {new_version}).")
     except CloudAuthError as exc:
         _handle_auth_error(exc)
 
 
 @click.command("pull")
-@click.option("--force", "-f", is_flag=True, help="Pull even if local has a newer version.")
+@click.option("--force", "-f", is_flag=True, help="pull even if local has a newer version.")
 def pull(force: bool) -> None:
-    """Pull the database from cloud storage."""
+    """pull the database from cloud storage."""
     from bud.services.storage import CloudAuthError, get_provider
 
     bucket_url = _get_bucket_url()
@@ -114,7 +114,7 @@ def pull(force: bool) -> None:
     try:
         remote_meta = provider.read_json(REMOTE_META_KEY)
         if remote_meta is None:
-            click.echo("Error: no database found in remote storage. Push first.", err=True)
+            click.echo("error: no database found in remote storage. push first.", err=True)
             sys.exit(1)
 
         remote_version = remote_meta.get("version", 0)
@@ -124,8 +124,8 @@ def pull(force: bool) -> None:
 
         if local_version > remote_version and not force:
             click.echo(
-                f"Error: local version ({local_version}) is newer than remote ({remote_version}).\n"
-                "Push your changes first, or use --force to overwrite.",
+                f"error: local version ({local_version}) is newer than remote ({remote_version}).\n"
+                "push your changes first, or use --force to overwrite.",
                 err=True,
             )
             sys.exit(1)
@@ -139,6 +139,6 @@ def pull(force: bool) -> None:
         provider.download(REMOTE_DB_KEY, DB_PATH)
         _save_local_meta(remote_meta)
 
-        click.echo(f"Pulled database from {bucket_url} (version {remote_version}).")
+        click.echo(f"pulled database from {bucket_url} (version {remote_version}).")
     except CloudAuthError as exc:
         _handle_auth_error(exc)

@@ -11,17 +11,17 @@ from bud.services import accounts as account_service
 
 @click.group()
 def account():
-    """Manage accounts."""
+    """manage accounts."""
     pass
 
 
 @account.command("list")
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
-@click.option("--show-id", "-s", is_flag=True, default=False, help="Show account UUIDs")
-@click.option("--type", "-t", "show_type", is_flag=True, default=False, help="Show account type column")
-@click.option("--initial-balance", "-i", "show_initial_balance", is_flag=True, default=False, help="Show initial balance column")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
+@click.option("--show-id", "-s", is_flag=True, default=False, help="show account uuids")
+@click.option("--type", "-t", "show_type", is_flag=True, default=False, help="show account type column")
+@click.option("--initial-balance", "-i", "show_initial_balance", is_flag=True, default=False, help="show initial balance column")
 def list_accounts(project_id, show_id, show_type, show_initial_balance):
-    """List accounts."""
+    """list accounts."""
     async def _run():
         async with get_session() as db:
             pid = await resolve_project_id(db, project_id)
@@ -62,10 +62,10 @@ def list_accounts(project_id, show_id, show_type, show_initial_balance):
 @account.command("create")
 @click.argument("name")
 @click.option("--type", "-t", "account_type", type=click.Choice(["credit", "debit"]), default="debit")
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
-@click.option("--initial-balance", "-i", "initial_balance", type=float, default=0, help="Initial balance (default: 0)")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
+@click.option("--initial-balance", "-i", "initial_balance", type=float, default=0, help="initial balance (default: 0)")
 def create_account(name, account_type, project_id, initial_balance):
-    """Create a new account."""
+    """create a new account."""
     async def _run():
         async with get_session() as db:
             pid = await resolve_project_id(db, project_id)
@@ -85,14 +85,14 @@ def create_account(name, account_type, project_id, initial_balance):
 
 @account.command("edit")
 @click.argument("identifier", required=False, default=None)
-@click.option("--id", "record_id", default=None, help="Account UUID")
+@click.option("--id", "record_id", default=None, help="account uuid")
 @click.option("--name", "-n", default=None)
 @click.option("--type", "-t", "account_type", type=click.Choice(["credit", "debit"]), default=None)
-@click.option("--initial-balance", "-i", "initial_balance", type=float, default=None, help="Set initial balance")
-@click.option("--current-balance", "-c", "current_balance", type=float, default=None, help="Set current balance")
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
+@click.option("--initial-balance", "-i", "initial_balance", type=float, default=None, help="set initial balance")
+@click.option("--current-balance", "-c", "current_balance", type=float, default=None, help="set current balance")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
 def edit_account(identifier, record_id, name, account_type, initial_balance, current_balance, project_id):
-    """Edit an account. Specify by list counter or name (default) or --id."""
+    """edit an account. specify by list counter or name (default) or --id."""
     async def _run():
         async with get_session() as db:
             if record_id:
@@ -135,10 +135,10 @@ def edit_account(identifier, record_id, name, account_type, initial_balance, cur
 
 @account.command("delete")
 @click.argument("account_id")
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name (required when ACCOUNT_ID is a name or counter)")
-@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name (required when account_id is a name or counter)")
+@click.option("--yes", "-y", is_flag=True, default=False, help="skip confirmation prompt")
 def delete_account(account_id, project_id, yes):
-    """Delete an account. ACCOUNT_ID can be a UUID, name, or list counter (#)."""
+    """delete an account. account_id can be a uuid, name, or list counter (#)."""
     async def _run():
         async with get_session() as db:
             if account_id.isdigit():

@@ -29,7 +29,7 @@ def _list_alias(list_cmd: click.Command, alias_for: str, resource: str) -> click
         name=None,
         callback=_callback,
         params=list(list_cmd.params),
-        help=f"List {resource}  (alias for: {alias_for})",
+        help=f"list {resource}  (alias for: {alias_for})",
     )
 
 
@@ -65,7 +65,7 @@ def _add_visible_alias(group: click.Group, cmd: click.Command, alias: str, canon
 
 @click.group()
 def cli():
-    """bud - Budget management CLI."""
+    """bud - budget management cli."""
     pass
 
 
@@ -82,7 +82,7 @@ cli.add_command(db)
 
 @cli.group("config")
 def config():
-    """Manage CLI configuration."""
+    """manage cli configuration."""
     pass
 
 
@@ -90,14 +90,14 @@ def config():
 @click.argument("key")
 @click.argument("value")
 def config_set(key, value):
-    """Set a configuration value."""
+    """set a configuration value."""
     set_config_value(key, value)
     click.echo(f"{key}: {value}")
 
 
 @config.command("list")
 def config_list():
-    """List current configurations."""
+    """list current configurations."""
     from bud.commands.config_store import load_config
     cfg = load_config()
     for k, v in cfg.items():

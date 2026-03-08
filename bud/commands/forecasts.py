@@ -19,7 +19,7 @@ from bud.services import recurrences as recurrence_service
 
 @click.group()
 def forecast():
-    """Manage forecasts."""
+    """manage forecasts."""
     pass
 
 
@@ -81,11 +81,11 @@ def _filtered_forecasts(items, filter_expr):
 
 @forecast.command("list")
 @click.argument("budget_id", default=None, required=False)
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
-@click.option("--show-id", "-s", is_flag=True, default=False, help="Show forecast UUIDs")
-@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (e.g. \"a=bb;t=fixo;c=outros;v<0\")")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
+@click.option("--show-id", "-s", is_flag=True, default=False, help="show forecast uuids")
+@click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (e.g. \"a=bb;t=fixo;c=outros;v<0\")")
 def list_forecasts(budget_id, project_id, show_id, filter_expr):
-    """List all forecasts for a budget. Defaults to the current month's budget."""
+    """list all forecasts for a budget. defaults to the current month's budget."""
     async def _run():
         from bud.commands.utils import require_month
         async with get_session() as db:
@@ -138,18 +138,18 @@ def list_forecasts(budget_id, project_id, show_id, filter_expr):
 @click.argument("budget_id", default=None, required=False)
 @click.option("--description", "-d", default=None)
 @click.option("--value", "-v", required=True, type=float)
-@click.option("--category", "-c", "category_id", default=None, help="Category UUID or name")
-@click.option("--tags", "-t", default=None, help="Comma-separated tags")
-@click.option("--recurrent", "-r", is_flag=True, default=False, help="Mark as recurrent")
-@click.option("--recurrence-end", "-e", default=None, help="Last month for recurrence (YYYY-MM)")
-@click.option("--installments", "-i", type=int, default=None, help="Number of installments")
-@click.option("--current-installment", type=int, default=None, help="Current installment number (e.g. 5 means this is the 5th of N)")
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
+@click.option("--category", "-c", "category_id", default=None, help="category uuid or name")
+@click.option("--tags", "-t", default=None, help="comma-separated tags")
+@click.option("--recurrent", "-r", is_flag=True, default=False, help="mark as recurrent")
+@click.option("--recurrence-end", "-e", default=None, help="last month for recurrence (yyyy-mm)")
+@click.option("--installments", "-i", type=int, default=None, help="number of installments")
+@click.option("--current-installment", type=int, default=None, help="current installment number (e.g. 5 means this is the 5th of n)")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
 def create_forecast(budget_id, description, value, category_id, tags, recurrent, recurrence_end, installments, current_installment, project_id):
-    """Create a forecast. Budget defaults to the current month and is auto-created if missing.
+    """create a forecast. budget defaults to the current month and is auto-created if missing.
 
-    At least one of --description, --category, or --tags must be provided.
-    Forecasts match transactions using all provided criteria (AND logic).
+    at least one of --description, --category, or --tags must be provided.
+    forecasts match transactions using all provided criteria (and logic).
     """
     async def _run():
         tag_list = [t.strip() for t in tags.split(",")] if tags else []
@@ -306,18 +306,18 @@ def create_forecast(budget_id, description, value, category_id, tags, recurrent,
 
 @forecast.command("edit")
 @click.argument("counter", required=False, type=int, default=None)
-@click.option("--id", "record_id", default=None, help="Forecast UUID")
+@click.option("--id", "record_id", default=None, help="forecast uuid")
 @click.option("--description", "-d", default=None)
 @click.option("--value", "-v", type=float, default=None)
-@click.option("--category", "-c", "category_id", default=None, help="Category UUID or name")
+@click.option("--category", "-c", "category_id", default=None, help="category uuid or name")
 @click.option("--tags", "-t", default=None)
-@click.option("--recurrent", "-r", is_flag=True, default=False, help="Turn into a recurrent forecast")
-@click.option("--recurrence-end", "-e", default=None, help="Last month for recurrence (YYYY-MM)")
-@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (counter references filtered list)")
+@click.option("--recurrent", "-r", is_flag=True, default=False, help="turn into a recurrent forecast")
+@click.option("--recurrence-end", "-e", default=None, help="last month for recurrence (yyyy-mm)")
+@click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (counter references filtered list)")
 @click.argument("budget_id", default=None, required=False)
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
 def edit_forecast(counter, record_id, description, value, category_id, tags, recurrent, recurrence_end, filter_expr, budget_id, project_id):
-    """Edit a forecast. Specify by list counter (default) or --id."""
+    """edit a forecast. specify by list counter (default) or --id."""
     async def _run():
         tag_list = [t.strip() for t in tags.split(",")] if tags else None
         async with get_session() as db:
@@ -435,11 +435,11 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, rec
 @forecast.command("delete")
 @click.argument("forecast_id")
 @click.argument("budget_id", default=None, required=False)
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
-@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
-@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (counter references filtered list)")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
+@click.option("--yes", "-y", is_flag=True, default=False, help="skip confirmation prompt")
+@click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (counter references filtered list)")
 def delete_forecast(forecast_id, budget_id, project_id, yes, filter_expr):
-    """Delete a forecast. FORECAST_ID can be a UUID or list counter (#)."""
+    """delete a forecast. forecast_id can be a uuid or list counter (#)."""
     async def _run():
         async with get_session() as db:
             if forecast_id.isdigit():

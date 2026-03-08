@@ -12,14 +12,14 @@ from bud.services import projects as project_service
 
 @click.group()
 def project():
-    """Manage projects."""
+    """manage projects."""
     pass
 
 
 @project.command("list")
-@click.option("--show-id", "-s", is_flag=True, default=False, help="Show project UUIDs")
+@click.option("--show-id", "-s", is_flag=True, default=False, help="show project uuids")
 def list_projects(show_id):
-    """List all projects."""
+    """list all projects."""
     async def _run():
         async with get_session() as db:
             items = await project_service.list_projects(db)
@@ -38,9 +38,9 @@ def list_projects(show_id):
 
 
 @project.command("create")
-@click.option("--name", "-n", required=True, help="Project name")
+@click.option("--name", "-n", required=True, help="project name")
 def create_project(name):
-    """Create a new project."""
+    """create a new project."""
     async def _run():
         async with get_session() as db:
             p = await project_service.create_project(db, ProjectCreate(name=name))
@@ -51,10 +51,10 @@ def create_project(name):
 
 @project.command("edit")
 @click.argument("counter", required=False, type=int, default=None)
-@click.option("--id", "record_id", default=None, help="Project UUID")
+@click.option("--id", "record_id", default=None, help="project uuid")
 @click.option("--name", "-n", default=None)
 def edit_project(counter, record_id, name):
-    """Edit a project. Specify by list counter (default) or --id."""
+    """edit a project. specify by list counter (default) or --id."""
     async def _run():
         async with get_session() as db:
             if record_id:
@@ -79,9 +79,9 @@ def edit_project(counter, record_id, name):
 
 @project.command("delete")
 @click.argument("project_id")
-@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
+@click.option("--yes", "-y", is_flag=True, default=False, help="skip confirmation prompt")
 def delete_project(project_id, yes):
-    """Delete a project. PROJECT_ID can be a UUID, name, or list counter (#)."""
+    """delete a project. project_id can be a uuid, name, or list counter (#)."""
     async def _run():
         async with get_session() as db:
             if project_id.isdigit():
@@ -114,7 +114,7 @@ def delete_project(project_id, yes):
 @project.command("set-default")
 @click.argument("project_id")
 def set_default(project_id):
-    """Set the default project. PROJECT_ID can be a UUID or project name."""
+    """set the default project. project_id can be a uuid or project name."""
     async def _run():
         async with get_session() as db:
             pid = await resolve_project_id(db, project_id)
