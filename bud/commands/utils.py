@@ -88,7 +88,12 @@ def maybe_auto_push(auto_push_flag: bool) -> None:
     """Push to cloud storage if auto-push is enabled (via flag or config)."""
     if auto_push_flag or get_auto_push():
         from bud.commands.sync import run_push
-        run_push()
+        from bud.services.storage import CloudAuthError
+
+        try:
+            run_push()
+        except CloudAuthError as exc:
+            click.echo(f"auto-push failed: {exc}", err=True)
 
 
 def with_auto_push(fn):

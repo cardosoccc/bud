@@ -58,8 +58,9 @@ def run_push(force: bool = False) -> bool:
     """Push the local database to cloud storage.
 
     Returns True on success, False on failure (after printing an error).
+    Raises CloudAuthError on authentication failures.
     """
-    from bud.services.storage import CloudAuthError, get_provider
+    from bud.services.storage import get_provider
 
     if not DB_PATH.exists():
         click.echo("error: local database does not exist. run `bud db init` first.", err=True)
@@ -70,47 +71,44 @@ def run_push(force: bool = False) -> bool:
         click.echo("auto-push skipped: no bucket configured.", err=True)
         return False
 
-    try:
-        provider = get_provider(url)
-    except CloudAuthError as exc:
-        click.echo(f"auto-push failed: {exc}", err=True)
+    provider = get_provider(url)
+
+    local_meta = _load_local_meta()
+    local_version = local_meta.get("version", 0)
+
+    remote_meta = provider.read_json(REMOTE_META_KEY)
+    remote_version = remote_meta.get("version", 0) if remote_meta else 0
+
+    if remote_version > local_version and not force:
+        click.echo(
+            f"error: remote version ({remote_version}) is newer than local ({local_version}).\n"
+            "pull the latest version first, or use --force to overwrite.",
+            err=True,
+        )
         return False
 
-    try:
-        local_meta = _load_local_meta()
-        local_version = local_meta.get("version", 0)
+    new_version = max(local_version, remote_version) + 1
+    new_meta = {"version": new_version, "pushed_at": time.time()}
 
-        remote_meta = provider.read_json(REMOTE_META_KEY)
-        remote_version = remote_meta.get("version", 0) if remote_meta else 0
+    provider.upload(DB_PATH, REMOTE_DB_KEY)
+    provider.upload_json(new_meta, REMOTE_META_KEY)
+    _save_local_meta(new_meta)
 
-        if remote_version > local_version and not force:
-            click.echo(
-                f"error: remote version ({remote_version}) is newer than local ({local_version}).\n"
-                "pull the latest version first, or use --force to overwrite.",
-                err=True,
-            )
-            return False
-
-        new_version = max(local_version, remote_version) + 1
-        new_meta = {"version": new_version, "pushed_at": time.time()}
-
-        provider.upload(DB_PATH, REMOTE_DB_KEY)
-        provider.upload_json(new_meta, REMOTE_META_KEY)
-        _save_local_meta(new_meta)
-
-        click.echo(f"pushed database to {url} (version {new_version}).")
-        return True
-    except CloudAuthError as exc:
-        click.echo(f"auto-push failed: {exc}", err=True)
-        return False
+    click.echo(f"pushed database to {url} (version {new_version}).")
+    return True
 
 
 @click.command("push")
 @click.option("--force", "-f", is_flag=True, help="push even if remote has a newer version.")
 def push(force: bool) -> None:
     """push the local database to cloud storage."""
-    if not run_push(force=force):
-        sys.exit(1)
+    from bud.services.storage import CloudAuthError
+
+    try:
+        if not run_push(force=force):
+            sys.exit(1)
+    except CloudAuthError as exc:
+        _handle_auth_error(exc)
 
 
 @click.command("pull")
