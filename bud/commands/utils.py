@@ -1,10 +1,11 @@
 """Shared CLI utilities."""
+import functools
 import uuid
 import sys
 from typing import Optional
 import click
 
-from bud.commands.config_store import get_default_project_id, get_active_month
+from bud.commands.config_store import get_default_project_id, get_active_month, get_auto_push
 
 
 def require_project_id(project_id: str = None) -> uuid.UUID:
@@ -81,3 +82,22 @@ async def resolve_budget_id(db, identifier: str, project_id: uuid.UUID) -> Optio
 
     budget = await budget_service.get_budget_by_name(db, project_id, identifier)
     return budget.id if budget else None
+
+
+def maybe_auto_push(auto_push_flag: bool) -> None:
+    """Push to cloud storage if auto-push is enabled (via flag or config)."""
+    if auto_push_flag or get_auto_push():
+        from bud.commands.sync import run_push
+        run_push()
+
+
+def with_auto_push(fn):
+    """Decorator that adds --auto-push flag and triggers push after the command."""
+    @click.option("--auto-push", is_flag=True, default=False,
+                  help="push to cloud storage after this operation")
+    @functools.wraps(fn)
+    def wrapper(*args, auto_push, **kwargs):
+        result = fn(*args, **kwargs)
+        maybe_auto_push(auto_push)
+        return result
+    return wrapper

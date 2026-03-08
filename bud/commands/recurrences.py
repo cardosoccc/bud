@@ -4,7 +4,7 @@ import click
 from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
-from bud.commands.utils import resolve_project_id, resolve_category_id, is_uuid
+from bud.commands.utils import resolve_project_id, resolve_category_id, is_uuid, with_auto_push
 from bud.filter import apply_filter
 from bud.schemas.category import CategoryCreate
 from bud.services import categories as category_service
@@ -109,6 +109,7 @@ def list_recurrences(month, show_all, project_id, show_id, filter_expr):
 @click.argument("month", default=None, required=False)
 @click.option("--all", "-a", "show_all", is_flag=True, default=False, help="use counter from full list")
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
+@with_auto_push
 def edit_recurrence(counter, record_id, description, value, category_id, tags,
                     start, end, installments, propagate, filter_expr, month, show_all, project_id):
     """edit a recurrence. specify by list counter (default) or --id."""
@@ -188,6 +189,7 @@ def edit_recurrence(counter, record_id, description, value, category_id, tags,
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
 @click.option("--yes", "-y", is_flag=True, default=False, help="skip confirmation prompt")
 @click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (counter references filtered list)")
+@with_auto_push
 def delete_recurrence(recurrence_id, month, show_all, cascade, project_id, yes, filter_expr):
     """delete a recurrence. recurrence_id can be a uuid or list counter (#)."""
     async def _run():

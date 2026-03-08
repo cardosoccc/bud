@@ -3,7 +3,7 @@ import click
 from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
-from bud.commands.utils import resolve_project_id, resolve_account_id, is_uuid
+from bud.commands.utils import resolve_project_id, resolve_account_id, is_uuid, with_auto_push
 from bud.models.account import AccountType
 from bud.schemas.account import AccountCreate, AccountUpdate
 from bud.services import accounts as account_service
@@ -64,6 +64,7 @@ def list_accounts(project_id, show_id, show_type, show_initial_balance):
 @click.option("--type", "-t", "account_type", type=click.Choice(["credit", "debit"]), default="debit")
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
 @click.option("--initial-balance", "-i", "initial_balance", type=float, default=0, help="initial balance (default: 0)")
+@with_auto_push
 def create_account(name, account_type, project_id, initial_balance):
     """create a new account."""
     async def _run():
@@ -91,6 +92,7 @@ def create_account(name, account_type, project_id, initial_balance):
 @click.option("--initial-balance", "-i", "initial_balance", type=float, default=None, help="set initial balance")
 @click.option("--current-balance", "-c", "current_balance", type=float, default=None, help="set current balance")
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
+@with_auto_push
 def edit_account(identifier, record_id, name, account_type, initial_balance, current_balance, project_id):
     """edit an account. specify by list counter or name (default) or --id."""
     async def _run():
@@ -137,6 +139,7 @@ def edit_account(identifier, record_id, name, account_type, initial_balance, cur
 @click.argument("account_id")
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name (required when account_id is a name or counter)")
 @click.option("--yes", "-y", is_flag=True, default=False, help="skip confirmation prompt")
+@with_auto_push
 def delete_account(account_id, project_id, yes):
     """delete an account. account_id can be a uuid, name, or list counter (#)."""
     async def _run():
