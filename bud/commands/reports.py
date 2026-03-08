@@ -49,11 +49,11 @@ def _build_table(headers, rows, widths, numeric):
 
 @click.command()
 @click.argument("budget_id", required=False, default=None)
-@click.option("--project", "-p", "project_id", default=None, help="Project name or ID.")
+@click.option("--project", "-p", "project_id", default=None, help="project name or id.")
 def report(budget_id, project_id):
-    """Show a budget report.
+    """show a budget report.
 
-    BUDGET_ID can be a UUID or a budget name (YYYY-MM). If omitted, defaults
+    budget_id can be a uuid or a budget name (yyyy-mm). if omitted, defaults
     to the current month's budget.
     """
     async def _run():

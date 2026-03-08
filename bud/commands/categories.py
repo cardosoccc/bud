@@ -11,14 +11,14 @@ from bud.services import categories as category_service
 
 @click.group()
 def category():
-    """Manage categories."""
+    """manage categories."""
     pass
 
 
 @category.command("list")
-@click.option("--show-id", "-s", is_flag=True, default=False, help="Show category UUIDs")
+@click.option("--show-id", "-s", is_flag=True, default=False, help="show category uuids")
 def list_categories(show_id):
-    """List all categories."""
+    """list all categories."""
     async def _run():
         async with get_session() as db:
             items = await category_service.list_categories(db)
@@ -39,7 +39,7 @@ def list_categories(show_id):
 @category.command("create")
 @click.argument("name")
 def create_category(name):
-    """Create a new category."""
+    """create a new category."""
     async def _run():
         async with get_session() as db:
             c = await category_service.create_category(db, CategoryCreate(name=name))
@@ -50,10 +50,10 @@ def create_category(name):
 
 @category.command("edit")
 @click.argument("counter", required=False, type=int, default=None)
-@click.option("--id", "record_id", default=None, help="Category UUID")
+@click.option("--id", "record_id", default=None, help="category uuid")
 @click.option("--name", "-n", required=True)
 def edit_category(counter, record_id, name):
-    """Edit a category. Specify by list counter (default) or --id."""
+    """edit a category. specify by list counter (default) or --id."""
     async def _run():
         async with get_session() as db:
             if record_id:
@@ -78,9 +78,9 @@ def edit_category(counter, record_id, name):
 
 @category.command("delete")
 @click.argument("category_id")
-@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
+@click.option("--yes", "-y", is_flag=True, default=False, help="skip confirmation prompt")
 def delete_category(category_id, yes):
-    """Delete a category. CATEGORY_ID can be a UUID, name, or list counter (#)."""
+    """delete a category. category_id can be a uuid, name, or list counter (#)."""
     async def _run():
         async with get_session() as db:
             if category_id.isdigit():

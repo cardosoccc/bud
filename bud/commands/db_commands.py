@@ -10,7 +10,7 @@ from bud.services.projects import create_project, get_project_by_name, set_defau
 
 @click.group("db")
 def db():
-    """Database management commands."""
+    """database management commands."""
     pass
 
 
@@ -20,7 +20,7 @@ db.add_command(pull)
 
 @db.command("init")
 def init():
-    """Create the database and all tables."""
+    """create the database and all tables."""
     async def _run():
         from sqlalchemy.ext.asyncio import AsyncSession
         from sqlalchemy.orm import sessionmaker
@@ -47,12 +47,12 @@ def init():
 
     project_id = run_async(_run())
     set_config_value("default_project_id", project_id)
-    click.echo(f"Database initialized at {DB_PATH}")
+    click.echo(f"database initialized at {DB_PATH}")
 
 
 @db.command("migrate")
 def migrate():
-    """Run pending database migrations."""
+    """run pending database migrations."""
     async def _run():
         from sqlalchemy.ext.asyncio import AsyncSession
         from sqlalchemy.orm import sessionmaker
@@ -77,8 +77,8 @@ def migrate():
 
     migrated = run_async(_run())
     if migrated:
-        click.echo(f"Migrated {migrated} recurrent forecasts to recurrence records.")
-    click.echo("Database migrated successfully.")
+        click.echo(f"migrated {migrated} recurrent forecasts to recurrence records.")
+    click.echo("database migrated successfully.")
 
 
 def _migrate_forecasts_schema(conn):
@@ -352,23 +352,23 @@ async def _deduplicate_recurrences(db):
 
 
 @db.command("destroy")
-@click.confirmation_option(prompt="This will permanently delete the database. Continue?")
+@click.confirmation_option(prompt="this will permanently delete the database. continue?")
 def destroy():
-    """Delete the database."""
+    """delete the database."""
     if DB_PATH.exists():
         DB_PATH.unlink()
-        click.echo(f"Database deleted: {DB_PATH}")
+        click.echo(f"database deleted: {DB_PATH}")
     else:
-        click.echo("Database does not exist.")
+        click.echo("database does not exist.")
 
 
 @db.command("reset")
-@click.confirmation_option(prompt="This will delete and recreate the database. Continue?")
+@click.confirmation_option(prompt="this will delete and recreate the database. continue?")
 def reset():
-    """Delete and recreate the database."""
+    """delete and recreate the database."""
     if DB_PATH.exists():
         DB_PATH.unlink()
-        click.echo(f"Database deleted: {DB_PATH}")
+        click.echo(f"database deleted: {DB_PATH}")
 
     async def _run():
         from sqlalchemy.ext.asyncio import AsyncSession
@@ -392,5 +392,5 @@ def reset():
 
     project_id = run_async(_run())
     set_config_value("default_project_id", project_id)
-    click.echo(f"Database initialized at {DB_PATH}")
-    click.echo("Database reset complete.")
+    click.echo(f"database initialized at {DB_PATH}")
+    click.echo("database reset complete.")

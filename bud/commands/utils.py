@@ -10,7 +10,7 @@ from bud.commands.config_store import get_default_project_id, get_active_month
 def require_project_id(project_id: str = None) -> uuid.UUID:
     pid = project_id or get_default_project_id()
     if not pid:
-        click.echo("Error: no project specified. Use --project or set a default with `bud project set-default`.", err=True)
+        click.echo("error: no project specified. use --project or set a default with `bud project set-default`.", err=True)
         sys.exit(1)
     return uuid.UUID(pid)
 

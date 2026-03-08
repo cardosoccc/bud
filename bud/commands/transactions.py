@@ -15,7 +15,7 @@ from bud.services import transactions as transaction_service
 
 @click.group()
 def transaction():
-    """Manage transactions."""
+    """manage transactions."""
     pass
 
 
@@ -28,11 +28,11 @@ def _filtered_transactions(items, filter_expr):
 
 @transaction.command("list")
 @click.argument("month", default=None, required=False)
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
-@click.option("--show-id", "-s", is_flag=True, default=False, help="Show transaction UUIDs")
-@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (e.g. \"a=bb;t=fixo;c=outros;v<0\")")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
+@click.option("--show-id", "-s", is_flag=True, default=False, help="show transaction uuids")
+@click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (e.g. \"a=bb;t=fixo;c=outros;v<0\")")
 def list_transactions(month, project_id, show_id, filter_expr):
-    """List transactions for a given month."""
+    """list transactions for a given month."""
     async def _run():
         async with get_session() as db:
             pid = await resolve_project_id(db, project_id)
@@ -66,7 +66,7 @@ def list_transactions(month, project_id, show_id, filter_expr):
 @transaction.command("show")
 @click.argument("transaction_id")
 def show_transaction(transaction_id):
-    """Show transaction details."""
+    """show transaction details."""
     async def _run():
         async with get_session() as db:
             t = await transaction_service.get_transaction(db, uuid.UUID(transaction_id))
@@ -85,20 +85,20 @@ def show_transaction(transaction_id):
 
 
 @transaction.command("create")
-@click.option("--value", "-v", type=float, default=None, help="Amount (positive = income, negative = expense)")
+@click.option("--value", "-v", type=float, default=None, help="amount (positive = income, negative = expense)")
 @click.option("--description", "-d", default=None)
-@click.option("--date", "-t", "txn_date", default=None, help="YYYY-MM-DD (default: today)")
-@click.option("--account", "-a", "account_id", required=True, help="Account UUID or name")
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
-@click.option("--category", "-c", "category_id", default=None, help="Category UUID or name")
-@click.option("--tags", default=None, help="Comma-separated tags")
+@click.option("--date", "-t", "txn_date", default=None, help="yyyy-mm-dd (default: today)")
+@click.option("--account", "-a", "account_id", required=True, help="account uuid or name")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
+@click.option("--category", "-c", "category_id", default=None, help="category uuid or name")
+@click.option("--tags", default=None, help="comma-separated tags")
 @click.option("--forecast", "-f", "forecast_counter", type=int, default=None,
-              help="Create from forecast # (uses forecast value, description, category, tags)")
+              help="create from forecast # (uses forecast value, description, category, tags)")
 def create_transaction(value, description, txn_date, account_id, project_id, category_id, tags, forecast_counter):
-    """Create a new transaction. Use positive values for income and negative for expenses.
+    """create a new transaction. use positive values for income and negative for expenses.
 
-    Use -f to create from a forecast: bud t c -f <forecast #> -a <account>
-    The forecast counter refers to the # column from the forecast list of the month
+    use -f to create from a forecast: bud t c -f <forecast #> -a <account>
+    the forecast counter refers to the # column from the forecast list of the month
     matching the transaction date.
     """
     async def _run():
@@ -190,17 +190,17 @@ def create_transaction(value, description, txn_date, account_id, project_id, cat
 
 @transaction.command("edit")
 @click.argument("counter", required=False, type=int, default=None)
-@click.option("--id", "record_id", default=None, help="Transaction UUID")
+@click.option("--id", "record_id", default=None, help="transaction uuid")
 @click.option("--value", "-v", type=float, default=None)
 @click.option("--description", "-d", default=None)
 @click.option("--date", "-t", "txn_date", default=None)
-@click.option("--category", "-c", "category_id", default=None, help="Category UUID or name")
-@click.option("--tags", default=None, help="Comma-separated tags")
-@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (counter references filtered list)")
+@click.option("--category", "-c", "category_id", default=None, help="category uuid or name")
+@click.option("--tags", default=None, help="comma-separated tags")
+@click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (counter references filtered list)")
 @click.argument("month", default=None, required=False)
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name (required when using counter)")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name (required when using counter)")
 def edit_transaction(counter, record_id, value, description, txn_date, category_id, tags, filter_expr, month, project_id):
-    """Edit a transaction. Specify by list counter (default) or --id."""
+    """edit a transaction. specify by list counter (default) or --id."""
     async def _run():
         async with get_session() as db:
             if record_id:
@@ -258,11 +258,11 @@ def edit_transaction(counter, record_id, value, description, txn_date, category_
 @transaction.command("delete")
 @click.argument("transaction_id")
 @click.argument("month", default=None, required=False)
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name (required when TRANSACTION_ID is a counter)")
-@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
-@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (counter references filtered list)")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name (required when transaction_id is a counter)")
+@click.option("--yes", "-y", is_flag=True, default=False, help="skip confirmation prompt")
+@click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (counter references filtered list)")
 def delete_transaction(transaction_id, month, project_id, yes, filter_expr):
-    """Delete a transaction. TRANSACTION_ID can be a UUID or a list counter (#)."""
+    """delete a transaction. transaction_id can be a uuid or a list counter (#)."""
     async def _run():
         async with get_session() as db:
             if transaction_id.isdigit():

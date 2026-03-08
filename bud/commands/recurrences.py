@@ -18,7 +18,7 @@ def _sort_key_unnamed_last(description):
 
 @click.group()
 def recurrence():
-    """Manage recurrences."""
+    """manage recurrences."""
     pass
 
 
@@ -55,12 +55,12 @@ def _filtered_recurrences(items, filter_expr):
 
 @recurrence.command("list")
 @click.argument("month", default=None, required=False)
-@click.option("--all", "-a", "show_all", is_flag=True, default=False, help="Show all recurrences")
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
-@click.option("--show-id", "-s", is_flag=True, default=False, help="Show recurrence UUIDs")
-@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (e.g. \"a=bb;t=fixo;c=outros;v<0\")")
+@click.option("--all", "-a", "show_all", is_flag=True, default=False, help="show all recurrences")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
+@click.option("--show-id", "-s", is_flag=True, default=False, help="show recurrence uuids")
+@click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (e.g. \"a=bb;t=fixo;c=outros;v<0\")")
 def list_recurrences(month, show_all, project_id, show_id, filter_expr):
-    """List recurrences. Defaults to those active in the current month."""
+    """list recurrences. defaults to those active in the current month."""
     async def _run():
         async with get_session() as db:
             pid, items = await _resolve_items(db, project_id, month, show_all)
@@ -96,22 +96,22 @@ def list_recurrences(month, show_all, project_id, show_id, filter_expr):
 
 @recurrence.command("edit")
 @click.argument("counter", required=False, type=int, default=None)
-@click.option("--id", "record_id", default=None, help="Recurrence UUID")
+@click.option("--id", "record_id", default=None, help="recurrence uuid")
 @click.option("--description", "-d", default=None)
 @click.option("--value", "-v", type=float, default=None)
-@click.option("--category", "-c", "category_id", default=None, help="Category UUID or name")
-@click.option("--tags", "-t", default=None, help="Comma-separated tags")
-@click.option("--start", "-s", default=None, help="Start month (YYYY-MM)")
-@click.option("--end", "-e", default=None, help="End month (YYYY-MM)")
+@click.option("--category", "-c", "category_id", default=None, help="category uuid or name")
+@click.option("--tags", "-t", default=None, help="comma-separated tags")
+@click.option("--start", "-s", default=None, help="start month (yyyy-mm)")
+@click.option("--end", "-e", default=None, help="end month (yyyy-mm)")
 @click.option("--installments", "-i", type=int, default=None)
-@click.option("--propagate", is_flag=True, default=False, help="Propagate changes to linked forecasts")
-@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (counter references filtered list)")
+@click.option("--propagate", is_flag=True, default=False, help="propagate changes to linked forecasts")
+@click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (counter references filtered list)")
 @click.argument("month", default=None, required=False)
-@click.option("--all", "-a", "show_all", is_flag=True, default=False, help="Use counter from full list")
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
+@click.option("--all", "-a", "show_all", is_flag=True, default=False, help="use counter from full list")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
 def edit_recurrence(counter, record_id, description, value, category_id, tags,
                     start, end, installments, propagate, filter_expr, month, show_all, project_id):
-    """Edit a recurrence. Specify by list counter (default) or --id."""
+    """edit a recurrence. specify by list counter (default) or --id."""
     async def _run():
         from decimal import Decimal
         from bud.schemas.recurrence import RecurrenceUpdate
@@ -183,13 +183,13 @@ def edit_recurrence(counter, record_id, description, value, category_id, tags,
 @recurrence.command("delete")
 @click.argument("recurrence_id")
 @click.argument("month", default=None, required=False)
-@click.option("--all", "-a", "show_all", is_flag=True, default=False, help="Use counter from full list")
-@click.option("--cascade", "-c", is_flag=True, default=False, help="Delete all linked forecasts too")
-@click.option("--project", "-p", "project_id", default=None, help="Project UUID or name")
-@click.option("--yes", "-y", is_flag=True, default=False, help="Skip confirmation prompt")
-@click.option("--filter", "-f", "filter_expr", default=None, help="Filter DSL (counter references filtered list)")
+@click.option("--all", "-a", "show_all", is_flag=True, default=False, help="use counter from full list")
+@click.option("--cascade", "-c", is_flag=True, default=False, help="delete all linked forecasts too")
+@click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
+@click.option("--yes", "-y", is_flag=True, default=False, help="skip confirmation prompt")
+@click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (counter references filtered list)")
 def delete_recurrence(recurrence_id, month, show_all, cascade, project_id, yes, filter_expr):
-    """Delete a recurrence. RECURRENCE_ID can be a UUID or list counter (#)."""
+    """delete a recurrence. recurrence_id can be a uuid or list counter (#)."""
     async def _run():
         async with get_session() as db:
             if recurrence_id.isdigit():
