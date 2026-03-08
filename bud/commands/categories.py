@@ -4,7 +4,7 @@ import click
 from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
-from bud.commands.utils import resolve_category_id
+from bud.commands.utils import resolve_category_id, with_auto_push
 from bud.schemas.category import CategoryCreate, CategoryUpdate
 from bud.services import categories as category_service
 
@@ -38,6 +38,7 @@ def list_categories(show_id):
 
 @category.command("create")
 @click.argument("name")
+@with_auto_push
 def create_category(name):
     """create a new category."""
     async def _run():
@@ -52,6 +53,7 @@ def create_category(name):
 @click.argument("counter", required=False, type=int, default=None)
 @click.option("--id", "record_id", default=None, help="category uuid")
 @click.option("--name", "-n", required=True)
+@with_auto_push
 def edit_category(counter, record_id, name):
     """edit a category. specify by list counter (default) or --id."""
     async def _run():
@@ -79,6 +81,7 @@ def edit_category(counter, record_id, name):
 @category.command("delete")
 @click.argument("category_id")
 @click.option("--yes", "-y", is_flag=True, default=False, help="skip confirmation prompt")
+@with_auto_push
 def delete_category(category_id, yes):
     """delete a category. category_id can be a uuid, name, or list counter (#)."""
     async def _run():

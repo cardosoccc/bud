@@ -3,7 +3,7 @@ import click
 from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
-from bud.commands.utils import resolve_project_id, resolve_budget_id, is_uuid
+from bud.commands.utils import resolve_project_id, resolve_budget_id, is_uuid, with_auto_push
 from bud.schemas.budget import BudgetCreate, BudgetUpdate
 from bud.services import budgets as budget_service
 
@@ -43,6 +43,7 @@ def list_budgets(project_id, show_id):
 @budget.command("create")
 @click.argument("month")
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
+@with_auto_push
 def create_budget(month, project_id):
     """create a budget for a month (yyyy-mm)."""
     async def _run():
@@ -62,6 +63,7 @@ def create_budget(month, project_id):
 @click.option("--id", "record_id", default=None, help="budget uuid")
 @click.option("--month", "-m", default=None, help="yyyy-mm")
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
+@with_auto_push
 def edit_budget(counter, record_id, month, project_id):
     """edit a budget. specify by list counter (default) or --id."""
     async def _run():
@@ -94,6 +96,7 @@ def edit_budget(counter, record_id, month, project_id):
 @click.argument("budget_id")
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name (required when budget_id is a month name or counter)")
 @click.option("--yes", "-y", is_flag=True, default=False, help="skip confirmation prompt")
+@with_auto_push
 def delete_budget(budget_id, project_id, yes):
     """delete a budget. budget_id can be a uuid, month name (yyyy-mm), or list counter (#)."""
     async def _run():

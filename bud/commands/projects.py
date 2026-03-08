@@ -4,7 +4,7 @@ import click
 from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
-from bud.commands.utils import resolve_project_id, is_uuid
+from bud.commands.utils import resolve_project_id, is_uuid, with_auto_push
 from bud.commands.config_store import set_config_value
 from bud.schemas.project import ProjectCreate, ProjectUpdate
 from bud.services import projects as project_service
@@ -39,6 +39,7 @@ def list_projects(show_id):
 
 @project.command("create")
 @click.option("--name", "-n", required=True, help="project name")
+@with_auto_push
 def create_project(name):
     """create a new project."""
     async def _run():
@@ -53,6 +54,7 @@ def create_project(name):
 @click.argument("counter", required=False, type=int, default=None)
 @click.option("--id", "record_id", default=None, help="project uuid")
 @click.option("--name", "-n", default=None)
+@with_auto_push
 def edit_project(counter, record_id, name):
     """edit a project. specify by list counter (default) or --id."""
     async def _run():
@@ -80,6 +82,7 @@ def edit_project(counter, record_id, name):
 @project.command("delete")
 @click.argument("project_id")
 @click.option("--yes", "-y", is_flag=True, default=False, help="skip confirmation prompt")
+@with_auto_push
 def delete_project(project_id, yes):
     """delete a project. project_id can be a uuid, name, or list counter (#)."""
     async def _run():

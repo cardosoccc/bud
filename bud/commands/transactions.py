@@ -6,7 +6,7 @@ from tabulate import tabulate
 from bud.commands.db import get_session, run_async
 from bud.commands.utils import (
     resolve_project_id, resolve_account_id, resolve_category_id, is_uuid,
-    require_month,
+    require_month, with_auto_push,
 )
 from bud.filter import apply_filter
 from bud.schemas.transaction import TransactionCreate, TransactionUpdate
@@ -94,6 +94,7 @@ def show_transaction(transaction_id):
 @click.option("--tags", default=None, help="comma-separated tags")
 @click.option("--forecast", "-f", "forecast_counter", type=int, default=None,
               help="create from forecast # (uses forecast value, description, category, tags)")
+@with_auto_push
 def create_transaction(value, description, txn_date, account_id, project_id, category_id, tags, forecast_counter):
     """create a new transaction. use positive values for income and negative for expenses.
 
@@ -199,6 +200,7 @@ def create_transaction(value, description, txn_date, account_id, project_id, cat
 @click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (counter references filtered list)")
 @click.argument("month", default=None, required=False)
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name (required when using counter)")
+@with_auto_push
 def edit_transaction(counter, record_id, value, description, txn_date, category_id, tags, filter_expr, month, project_id):
     """edit a transaction. specify by list counter (default) or --id."""
     async def _run():
@@ -261,6 +263,7 @@ def edit_transaction(counter, record_id, value, description, txn_date, category_
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name (required when transaction_id is a counter)")
 @click.option("--yes", "-y", is_flag=True, default=False, help="skip confirmation prompt")
 @click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (counter references filtered list)")
+@with_auto_push
 def delete_transaction(transaction_id, month, project_id, yes, filter_expr):
     """delete a transaction. transaction_id can be a uuid or a list counter (#)."""
     async def _run():

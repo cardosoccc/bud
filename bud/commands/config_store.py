@@ -30,11 +30,23 @@ def get_config_value(key: str, default=None):
 
 _KEY_ALIASES = {
     "month": "active_month",
+    "auto-push": "auto_push",
 }
+
+_BOOL_KEYS = {"auto_push"}
+
+
+def _coerce_value(key: str, value):
+    """Coerce string values to appropriate types for known keys."""
+    canonical = _KEY_ALIASES.get(key, key)
+    if canonical in _BOOL_KEYS and isinstance(value, str):
+        return value.lower() in ("true", "1", "yes", "on")
+    return value
 
 
 def set_config_value(key: str, value) -> None:
     key = _KEY_ALIASES.get(key, key)
+    value = _coerce_value(key, value)
     config = load_config()
     config[key] = value
     save_config(config)
@@ -46,6 +58,10 @@ def get_active_month() -> str:
 
 def get_default_project_id() -> Optional[str]:
     return get_config_value("default_project_id")
+
+
+def get_auto_push() -> bool:
+    return bool(get_config_value("auto_push", False))
 
 
 def get_db_url() -> str:

@@ -5,7 +5,7 @@ import click
 from tabulate import tabulate
 
 from bud.commands.db import get_session, run_async
-from bud.commands.utils import resolve_project_id, resolve_category_id, resolve_budget_id, is_uuid
+from bud.commands.utils import resolve_project_id, resolve_category_id, resolve_budget_id, is_uuid, with_auto_push
 from bud.filter import apply_filter
 from bud.schemas.budget import BudgetCreate
 from bud.schemas.category import CategoryCreate
@@ -145,6 +145,7 @@ def list_forecasts(budget_id, project_id, show_id, filter_expr):
 @click.option("--installments", "-i", type=int, default=None, help="number of installments")
 @click.option("--current-installment", type=int, default=None, help="current installment number (e.g. 5 means this is the 5th of n)")
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
+@with_auto_push
 def create_forecast(budget_id, description, value, category_id, tags, recurrent, recurrence_end, installments, current_installment, project_id):
     """create a forecast. budget defaults to the current month and is auto-created if missing.
 
@@ -316,6 +317,7 @@ def create_forecast(budget_id, description, value, category_id, tags, recurrent,
 @click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (counter references filtered list)")
 @click.argument("budget_id", default=None, required=False)
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
+@with_auto_push
 def edit_forecast(counter, record_id, description, value, category_id, tags, recurrent, recurrence_end, filter_expr, budget_id, project_id):
     """edit a forecast. specify by list counter (default) or --id."""
     async def _run():
@@ -438,6 +440,7 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, rec
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
 @click.option("--yes", "-y", is_flag=True, default=False, help="skip confirmation prompt")
 @click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (counter references filtered list)")
+@with_auto_push
 def delete_forecast(forecast_id, budget_id, project_id, yes, filter_expr):
     """delete a forecast. forecast_id can be a uuid or list counter (#)."""
     async def _run():
