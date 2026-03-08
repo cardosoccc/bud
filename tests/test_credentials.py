@@ -105,7 +105,7 @@ class TestConfigureAWS:
         result = runner.invoke(cli, ["config", "aws"], input="AKID123\nSECRET456\n")
 
         assert result.exit_code == 0
-        assert "AWS credentials saved" in result.output
+        assert "aws credentials saved" in result.output
 
         loaded = json.loads(creds_file.read_text())
         assert loaded["aws_access_key_id"] == "AKID123"
@@ -143,7 +143,7 @@ class TestConfigureGCP:
         )
 
         assert result.exit_code == 0
-        assert "GCP credentials saved" in result.output
+        assert "gcp credentials saved" in result.output
         loaded = json.loads(creds_file.read_text())
         assert loaded["gcp_service_account_key_file"] == str(key_file)
 

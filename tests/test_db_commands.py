@@ -254,7 +254,7 @@ class TestDbDestroy:
         db_file.write_bytes(b"fake-db-content")
         with patch("bud.commands.db_commands.DB_PATH", db_file):
             result = runner.invoke(db_cmd, ["destroy", "--yes"])
-        assert "Database deleted" in result.output
+        assert "database deleted" in result.output
 
     def test_destroy_outputs_db_path(self, runner, db_file):
         db_file.write_bytes(b"data")
@@ -357,7 +357,7 @@ class TestDbReset:
              patch("bud.commands.db_commands.get_engine", new=_make_test_get_engine(db_url)), \
              patch("bud.commands.db_commands.set_config_value"):
             result = runner.invoke(db_cmd, ["reset", "--yes"])
-        assert "Database deleted" in result.output
+        assert "database deleted" in result.output
 
     def test_reset_saves_default_project_id_to_config(self, runner, db_file, db_url):
         with patch("bud.commands.db_commands.DB_PATH", db_file), \
