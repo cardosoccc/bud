@@ -110,6 +110,9 @@ def list_forecasts(budget_id, project_id, show_id, filter_expr):
                 click.echo("no forecasts found.")
                 return
 
+            # Load transactions for computing current (actual) values
+            transactions = await forecast_service.get_budget_transactions(db, bid)
+
             def _display_description(f):
                 desc = _forecast_description(f)
                 if f.installment is not None and f.recurrence and f.recurrence.installments:
@@ -123,12 +126,15 @@ def list_forecasts(budget_id, project_id, show_id, filter_expr):
                     return f"{f.installment}/{f.recurrence.installments}" if f.recurrence and f.recurrence.installments else str(f.installment)
                 return "yes"
 
+            def _current_value(f):
+                return forecast_service.compute_forecast_actual(f, transactions)
+
             if show_id:
-                rows = [[i + 1, str(f.id), _display_description(f), f.value, f.category.name if f.category else "", ", ".join(f.tags) if f.tags else "", _recurrence_label(f)] for i, f in enumerate(items)]
-                headers = ["#", "id", "description", "value", "category", "tags", "recurrence"]
+                rows = [[i + 1, str(f.id), _display_description(f), f.value, _current_value(f), f.category.name if f.category else "", ", ".join(f.tags) if f.tags else "", _recurrence_label(f)] for i, f in enumerate(items)]
+                headers = ["#", "id", "description", "value", "current", "category", "tags", "recurrence"]
             else:
-                rows = [[i + 1, _display_description(f), f.value, f.category.name if f.category else "", ", ".join(f.tags) if f.tags else "", _recurrence_label(f)] for i, f in enumerate(items)]
-                headers = ["#", "description", "value", "category", "tags", "recurrence"]
+                rows = [[i + 1, _display_description(f), f.value, _current_value(f), f.category.name if f.category else "", ", ".join(f.tags) if f.tags else "", _recurrence_label(f)] for i, f in enumerate(items)]
+                headers = ["#", "description", "value", "current", "category", "tags", "recurrence"]
             click.echo(tabulate(rows, headers=headers, tablefmt="presto", floatfmt=".2f"))
 
     run_async(_run())
@@ -314,14 +320,16 @@ def create_forecast(budget_id, description, value, category_id, tags, recurrent,
 @click.option("--tags", "-t", default=None)
 @click.option("--recurrent", "-r", is_flag=True, default=False, help="turn into a recurrent forecast")
 @click.option("--recurrence-end", "-e", default=None, help="last month for recurrence (yyyy-mm)")
+@click.option("--adjust", "-a", is_flag=True, default=False, help="set value to the current actual (matched transactions sum)")
 @click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (counter references filtered list)")
 @click.argument("budget_id", default=None, required=False)
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
 @with_auto_push
-def edit_forecast(counter, record_id, description, value, category_id, tags, recurrent, recurrence_end, filter_expr, budget_id, project_id):
+def edit_forecast(counter, record_id, description, value, category_id, tags, recurrent, recurrence_end, adjust, filter_expr, budget_id, project_id):
     """edit a forecast. specify by list counter (default) or --id."""
     async def _run():
         tag_list = [t.strip() for t in tags.split(",")] if tags else None
+        effective_value = value
         async with get_session() as db:
             if record_id:
                 fid = uuid.UUID(record_id)
@@ -352,6 +360,23 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, rec
                 click.echo("error: provide a counter or --id.", err=True)
                 return
 
+            if adjust:
+                if effective_value is not None:
+                    click.echo("error: --adjust and --value cannot be used together.", err=True)
+                    return
+                # Load forecast to compute actual value
+                forecast_obj = await forecast_service.get_forecast(db, fid)
+                if not forecast_obj:
+                    click.echo("forecast not found.", err=True)
+                    return
+                # Eager-load category and recurrence for matching
+                forecast_with_rels = (await forecast_service.list_forecasts(db, forecast_obj.budget_id))
+                forecast_obj = next((fo for fo in forecast_with_rels if fo.id == fid), forecast_obj)
+                transactions = await forecast_service.get_budget_transactions(db, forecast_obj.budget_id)
+                actual = forecast_service.compute_forecast_actual(forecast_obj, transactions)
+                effective_value = float(actual)
+                click.echo(f"adjusting forecast value from {forecast_obj.value} to {actual}")
+
             cat = None
             if category_id:
                 cat = await resolve_category_id(db, category_id)
@@ -368,7 +393,7 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, rec
 
             f = await forecast_service.update_forecast(db, fid, ForecastUpdate(
                 description=description,
-                value=value,
+                value=effective_value,
                 category_id=cat,
                 tags=tag_list,
             ))

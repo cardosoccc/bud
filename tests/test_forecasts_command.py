@@ -484,3 +484,143 @@ class TestReportTransactionMatching:
         r = asyncio.run(_generate_report(cli_db, bid))
         assert r.forecasts[0].category_name == "Transport"
         assert r.forecasts[0].tags == ["commute"]
+
+
+# ---------------------------------------------------------------------------
+# List: shows current (actual) value column
+# ---------------------------------------------------------------------------
+
+class TestListShowsCurrentValue:
+    def test_list_shows_current_column_header(self, runner, cli_db):
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj", is_default=True))
+        bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+        asyncio.run(_seed_forecast(cli_db, bid, value=-200, description="Groceries"))
+        result = _invoke(runner, cli_db, ["list", "2025-01", "--project", "proj"])
+        assert result.exit_code == 0
+        assert "current" in result.output
+
+    def test_list_shows_current_value_with_matching_transactions(self, runner, cli_db):
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj", is_default=True))
+        bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+        asyncio.run(_seed_forecast(cli_db, bid, value=-200, description="Groceries"))
+        aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+        asyncio.run(_create_transaction(cli_db, pid, aid, value=-80, description="Groceries run", txn_date=date(2025, 1, 10)))
+        result = _invoke(runner, cli_db, ["list", "2025-01", "--project", "proj"])
+        assert result.exit_code == 0
+        assert "-80.00" in result.output
+
+    def test_list_shows_zero_current_when_no_matching_transactions(self, runner, cli_db):
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj", is_default=True))
+        bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+        asyncio.run(_seed_forecast(cli_db, bid, value=-200, description="Groceries"))
+        aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+        asyncio.run(_create_transaction(cli_db, pid, aid, value=-80, description="Unrelated", txn_date=date(2025, 1, 10)))
+        result = _invoke(runner, cli_db, ["list", "2025-01", "--project", "proj"])
+        assert result.exit_code == 0
+        # The current column should show 0.00 for this forecast
+        assert "current" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Edit --adjust: set forecast value to matched transactions sum
+# ---------------------------------------------------------------------------
+
+class TestEditAdjust:
+    def test_adjust_sets_value_to_actual(self, runner, cli_db):
+        """--adjust should set the forecast value to the sum of matching transactions."""
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj", is_default=True))
+        bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+        cat_id, _ = asyncio.run(_seed_category(cli_db, "Food"))
+        asyncio.run(_seed_forecast(cli_db, bid, value=-200, description="Groceries", category_id=cat_id))
+        aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+        asyncio.run(_create_transaction(cli_db, pid, aid, value=-80, description="Groceries run", category_id=cat_id, txn_date=date(2025, 1, 10)))
+        asyncio.run(_create_transaction(cli_db, pid, aid, value=-45, description="Groceries quick", category_id=cat_id, txn_date=date(2025, 1, 15)))
+
+        with patch("bud.commands.forecasts.get_session", _make_get_session(cli_db)):
+            result = runner.invoke(forecast, [
+                "edit", "1", "2025-01", "--project", "proj", "--adjust",
+            ])
+        assert result.exit_code == 0
+        assert "adjusting forecast value from" in result.output
+        assert "-125" in result.output
+
+        # Verify the value was updated
+        r = asyncio.run(_generate_report(cli_db, bid))
+        assert r.forecasts[0].forecast_value == Decimal("-125")
+
+    def test_adjust_does_not_change_recurrence(self, runner, cli_db):
+        """--adjust should only change this forecast, not the recurrence or other forecasts."""
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj", is_default=True))
+        bid_jan, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+        bid_feb, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-02"))
+
+        # Create a recurrent forecast via CLI
+        with patch("bud.commands.forecasts.get_session", _make_get_session(cli_db)):
+            result = runner.invoke(forecast, [
+                "create", "--value", "-200", "--description", "Groceries",
+                "--recurrent", "2025-01", "--project", "proj",
+            ])
+        assert result.exit_code == 0
+
+        aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+        asyncio.run(_create_transaction(cli_db, pid, aid, value=-150, description="Groceries run", txn_date=date(2025, 1, 10)))
+
+        # Adjust forecast #1 in January
+        with patch("bud.commands.forecasts.get_session", _make_get_session(cli_db)):
+            result = runner.invoke(forecast, [
+                "edit", "1", "2025-01", "--project", "proj", "--adjust",
+            ])
+        assert result.exit_code == 0
+        assert "adjusting" in result.output
+
+        # February forecast should still be -200
+        r_feb = asyncio.run(_generate_report(cli_db, bid_feb))
+        assert r_feb.forecasts[0].forecast_value == Decimal("-200")
+
+    def test_adjust_with_value_fails(self, runner, cli_db):
+        """--adjust and --value cannot be used together."""
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj", is_default=True))
+        bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+        asyncio.run(_seed_forecast(cli_db, bid, value=-200, description="Groceries"))
+
+        with patch("bud.commands.forecasts.get_session", _make_get_session(cli_db)):
+            result = runner.invoke(forecast, [
+                "edit", "1", "2025-01", "--project", "proj", "--adjust", "--value", "-100",
+            ])
+        assert "cannot be used together" in result.output
+
+    def test_adjust_no_matching_transactions_sets_zero(self, runner, cli_db):
+        """--adjust with no matching transactions should set value to 0."""
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj", is_default=True))
+        bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+        asyncio.run(_seed_forecast(cli_db, bid, value=-200, description="Groceries"))
+        aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+        asyncio.run(_create_transaction(cli_db, pid, aid, value=-80, description="Unrelated", txn_date=date(2025, 1, 10)))
+
+        with patch("bud.commands.forecasts.get_session", _make_get_session(cli_db)):
+            result = runner.invoke(forecast, [
+                "edit", "1", "2025-01", "--project", "proj", "--adjust",
+            ])
+        assert result.exit_code == 0
+        assert "adjusting" in result.output
+
+        r = asyncio.run(_generate_report(cli_db, bid))
+        assert r.forecasts[0].forecast_value == Decimal("0")
+
+    def test_adjust_with_short_flag(self, runner, cli_db):
+        """-a short flag should work like --adjust."""
+        pid, _ = asyncio.run(_seed_project(cli_db, "proj", is_default=True))
+        bid, _ = asyncio.run(_seed_budget(cli_db, pid, "2025-01"))
+        asyncio.run(_seed_forecast(cli_db, bid, value=-200, description="Groceries"))
+        aid, _ = asyncio.run(_seed_account(cli_db, pid, "Checking"))
+        asyncio.run(_create_transaction(cli_db, pid, aid, value=-50, description="Groceries shop", txn_date=date(2025, 1, 10)))
+
+        with patch("bud.commands.forecasts.get_session", _make_get_session(cli_db)):
+            result = runner.invoke(forecast, [
+                "edit", "1", "2025-01", "--project", "proj", "-a",
+            ])
+        assert result.exit_code == 0
+        assert "adjusting" in result.output
+
+        r = asyncio.run(_generate_report(cli_db, bid))
+        assert r.forecasts[0].forecast_value == Decimal("-50")

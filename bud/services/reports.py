@@ -13,6 +13,7 @@ from bud.models.transaction import Transaction
 from bud.models.account import Account
 from bud.models.project import project_accounts
 from bud.schemas.report import ReportRead, AccountBalance, ForecastActual
+from bud.services.forecasts import compute_forecast_actual
 
 
 async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
@@ -101,19 +102,7 @@ async def generate_report(db: AsyncSession, budget_id: uuid.UUID) -> ReportRead:
 
     forecast_actuals = []
     for forecast in forecasts:
-        has_criteria = forecast.description or forecast.category_id or forecast.tags
-        if has_criteria:
-            actual = Decimal("0")
-            for t in transactions:
-                if forecast.category_id and t.category_id != forecast.category_id:
-                    continue
-                if forecast.description and forecast.description.lower() not in t.description.lower():
-                    continue
-                if forecast.tags and not all(tag in (t.tags or []) for tag in forecast.tags):
-                    continue
-                actual += Decimal(str(t.value))
-        else:
-            actual = Decimal("0")
+        actual = compute_forecast_actual(forecast, transactions)
 
         forecast_val = Decimal(str(forecast.value))
         total_installments = None
@@ -205,22 +194,7 @@ async def _calculate_accumulated_remaining(
 
             for f in budget_forecasts:
                 forecast_val = Decimal(str(f.value))
-
-                # Calculate actual for this forecast
-                has_criteria = f.description or f.category_id or f.tags
-                if has_criteria:
-                    actual = Decimal("0")
-                    for t in budget_txns:
-                        if f.category_id and t.category_id != f.category_id:
-                            continue
-                        if f.description and f.description.lower() not in t.description.lower():
-                            continue
-                        if f.tags and not all(tag in (t.tags or []) for tag in f.tags):
-                            continue
-                        actual += Decimal(str(t.value))
-                else:
-                    actual = Decimal("0")
-
+                actual = compute_forecast_actual(f, budget_txns)
                 cumulative += forecast_val - actual
 
     return cumulative

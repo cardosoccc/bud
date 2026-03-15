@@ -1,11 +1,14 @@
 import uuid
+from decimal import Decimal
 from typing import Optional, List
 
-from sqlalchemy import select
+from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from bud.models.budget import Budget
 from bud.models.forecast import Forecast
+from bud.models.transaction import Transaction
 from bud.schemas.forecast import ForecastCreate, ForecastUpdate
 
 
@@ -58,6 +61,49 @@ async def delete_forecast(db: AsyncSession, forecast_id: uuid.UUID) -> bool:
     await db.delete(forecast)
     await db.commit()
     return True
+
+
+def compute_forecast_actual(forecast: Forecast, transactions: list) -> Decimal:
+    """Compute the actual (current) value for a forecast by matching transactions.
+
+    Uses the same AND logic as the status report:
+    - category: exact match on category_id
+    - description: case-insensitive substring match
+    - tags: all forecast tags must be present in the transaction
+    """
+    has_criteria = forecast.description or forecast.category_id or forecast.tags
+    if not has_criteria:
+        return Decimal("0")
+
+    actual = Decimal("0")
+    for t in transactions:
+        if forecast.category_id and t.category_id != forecast.category_id:
+            continue
+        if forecast.description and forecast.description.lower() not in t.description.lower():
+            continue
+        if forecast.tags and not all(tag in (t.tags or []) for tag in forecast.tags):
+            continue
+        actual += Decimal(str(t.value))
+    return actual
+
+
+async def get_budget_transactions(db: AsyncSession, budget_id: uuid.UUID) -> List[Transaction]:
+    """Get all transactions for a budget's period."""
+    budget_result = await db.execute(select(Budget).where(Budget.id == budget_id))
+    budget = budget_result.scalar_one_or_none()
+    if not budget:
+        return []
+
+    txns_result = await db.execute(
+        select(Transaction).where(
+            and_(
+                Transaction.project_id == budget.project_id,
+                Transaction.date >= budget.start_date,
+                Transaction.date <= budget.end_date,
+            )
+        )
+    )
+    return list(txns_result.scalars().all())
 
 
 async def forecast_exists_for_recurrence(
