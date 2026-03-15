@@ -1,8 +1,6 @@
 import uuid
 from datetime import date as date_type
 import click
-from tabulate import tabulate
-
 from bud.commands.db import get_session, run_async
 from bud.commands.utils import (
     resolve_project_id, resolve_account_id, resolve_category_id, is_uuid,
@@ -46,19 +44,22 @@ def list_transactions(month, project_id, show_id, filter_expr):
             if not items:
                 click.echo("no transactions found.")
                 return
+            from bud.commands.table_format import format_table
             if show_id:
                 rows = [
                     [i + 1, str(t.id), t.date, t.description, t.value, t.category.name if t.category else "", ", ".join(t.tags) if t.tags else "", t.account.name]
                     for i, t in enumerate(items)
                 ]
                 headers = ["#", "id", "date", "description", "value", "category", "tags", "account"]
+                col_types = ["num", "id", "text", "text", "num", "text", "tag", "text"]
             else:
                 rows = [
                     [i + 1, t.date, t.description, t.value, t.category.name if t.category else "", ", ".join(t.tags) if t.tags else "", t.account.name]
                     for i, t in enumerate(items)
                 ]
                 headers = ["#", "date", "description", "value", "category", "tags", "account"]
-            click.echo(tabulate(rows, headers=headers, tablefmt="presto", floatfmt=".2f"))
+                col_types = ["num", "text", "text", "num", "text", "tag", "text"]
+            click.echo(format_table(headers, rows, col_types))
 
     run_async(_run())
 

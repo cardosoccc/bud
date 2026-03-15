@@ -1,8 +1,6 @@
 import uuid
 
 import click
-from tabulate import tabulate
-
 from bud.commands.db import get_session, run_async
 from bud.commands.utils import resolve_category_id, with_auto_push
 from bud.schemas.category import CategoryCreate, CategoryUpdate
@@ -25,13 +23,16 @@ def list_categories(show_id):
             if not items:
                 click.echo("no categories found.")
                 return
+            from bud.commands.table_format import format_table
             if show_id:
                 rows = [[i + 1, str(c.id), c.name] for i, c in enumerate(items)]
                 headers = ["#", "id", "name"]
+                col_types = ["num", "id", "text"]
             else:
                 rows = [[i + 1, c.name] for i, c in enumerate(items)]
                 headers = ["#", "name"]
-            click.echo(tabulate(rows, headers=headers, tablefmt="presto"))
+                col_types = ["num", "text"]
+            click.echo(format_table(headers, rows, col_types))
 
     run_async(_run())
 

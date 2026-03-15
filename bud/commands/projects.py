@@ -1,8 +1,6 @@
 import uuid
 
 import click
-from tabulate import tabulate
-
 from bud.commands.db import get_session, run_async
 from bud.commands.utils import resolve_project_id, is_uuid, with_auto_push
 from bud.commands.config_store import set_config_value
@@ -26,13 +24,16 @@ def list_projects(show_id):
             if not items:
                 click.echo("no projects found.")
                 return
+            from bud.commands.table_format import format_table
             if show_id:
                 rows = [[i + 1, str(p.id), p.name, "yes" if p.is_default else ""] for i, p in enumerate(items)]
                 headers = ["#", "id", "name", "default"]
+                col_types = ["num", "id", "text", "text"]
             else:
                 rows = [[i + 1, p.name, "yes" if p.is_default else ""] for i, p in enumerate(items)]
                 headers = ["#", "name", "default"]
-            click.echo(tabulate(rows, headers=headers, tablefmt="presto"))
+                col_types = ["num", "text", "text"]
+            click.echo(format_table(headers, rows, col_types))
 
     run_async(_run())
 
