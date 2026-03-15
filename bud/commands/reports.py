@@ -25,9 +25,9 @@ def _fmt_row(values, col_types):
     return _render([], [str_vals], widths, col_types).split("\n")[-1]
 
 
-def _build_report_table(headers, rows, col_types):
+def _build_report_table(headers, rows, col_types, screen=False):
     """Build a report table and return (table_str, separator, col_types) for appending extra rows."""
-    return format_table(headers, rows, col_types)
+    return format_table(headers, rows, col_types, screen=screen)
 
 
 def _report_extra_row(values, col_types, ref_table):
@@ -58,7 +58,8 @@ def _report_separator(ref_table):
 @click.command()
 @click.argument("budget_id", required=False, default=None)
 @click.option("--project", "-p", "project_id", default=None, help="project name or id.")
-def report(budget_id, project_id):
+@click.option("--screen", "-s", is_flag=True, default=False, help="fit table to screen (100 chars)")
+def report(budget_id, project_id, screen):
     """show a budget report.
 
     budget_id can be a uuid or a budget name (yyyy-mm). if omitted, defaults
@@ -100,7 +101,7 @@ def report(budget_id, project_id):
                 total_curr = sum(b.current_balance for b in r.account_balances)
                 total_diff = sum(b.difference for b in r.account_balances)
 
-                table = _build_report_table(_T1_HEADERS, rows, _T1_COL_TYPES)
+                table = _build_report_table(_T1_HEADERS, rows, _T1_COL_TYPES, screen=screen)
                 sep = _report_separator(table)
                 total_row = _report_extra_row(["total", total_calc, total_curr, total_diff], _T1_COL_TYPES, table)
                 acc_remaining = r.accumulated_remaining if r.accumulated_remaining is not None else total_remaining
@@ -125,7 +126,7 @@ def report(budget_id, project_id):
                 total_forecasted = sum(f.forecast_value for f in r.forecasts)
                 total_current = sum(f.actual_value for f in r.forecasts)
 
-                table = _build_report_table(_T2_HEADERS, rows, _T2_COL_TYPES)
+                table = _build_report_table(_T2_HEADERS, rows, _T2_COL_TYPES, screen=screen)
                 sep = _report_separator(table)
                 total_row = _report_extra_row(["total", "", "", total_forecasted, total_current, total_remaining], _T2_COL_TYPES, table)
                 click.echo("\n")

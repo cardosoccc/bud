@@ -15,8 +15,9 @@ def project():
 
 
 @project.command("list")
-@click.option("--show-id", "-s", is_flag=True, default=False, help="show project uuids")
-def list_projects(show_id):
+@click.option("--show-id", is_flag=True, default=False, help="show project uuids")
+@click.option("--screen", "-s", is_flag=True, default=False, help="fit table to screen (100 chars)")
+def list_projects(show_id, screen):
     """list all projects."""
     async def _run():
         async with get_session() as db:
@@ -33,7 +34,7 @@ def list_projects(show_id):
                 rows = [[i + 1, p.name, "yes" if p.is_default else ""] for i, p in enumerate(items)]
                 headers = ["#", "name", "default"]
                 col_types = ["num", "text", "text"]
-            click.echo(format_table(headers, rows, col_types))
+            click.echo(format_table(headers, rows, col_types, screen=screen))
 
     run_async(_run())
 

@@ -15,10 +15,11 @@ def account():
 
 @account.command("list")
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
-@click.option("--show-id", "-s", is_flag=True, default=False, help="show account uuids")
+@click.option("--show-id", is_flag=True, default=False, help="show account uuids")
 @click.option("--type", "-t", "show_type", is_flag=True, default=False, help="show account type column")
 @click.option("--initial-balance", "-i", "show_initial_balance", is_flag=True, default=False, help="show initial balance column")
-def list_accounts(project_id, show_id, show_type, show_initial_balance):
+@click.option("--screen", "-s", is_flag=True, default=False, help="fit table to screen (100 chars)")
+def list_accounts(project_id, show_id, show_type, show_initial_balance, screen):
     """list accounts."""
     async def _run():
         async with get_session() as db:
@@ -59,7 +60,7 @@ def list_accounts(project_id, show_id, show_type, show_initial_balance):
                     row.append(float(a.initial_balance))
                 row.append(float(a.current_balance))
                 rows.append(row)
-            click.echo(format_table(headers, rows, col_types))
+            click.echo(format_table(headers, rows, col_types, screen=screen))
 
     run_async(_run())
 

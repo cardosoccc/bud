@@ -80,9 +80,10 @@ def _filtered_forecasts(items, filter_expr):
 @forecast.command("list")
 @click.argument("budget_id", default=None, required=False)
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
-@click.option("--show-id", "-s", is_flag=True, default=False, help="show forecast uuids")
+@click.option("--show-id", is_flag=True, default=False, help="show forecast uuids")
 @click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (e.g. \"a=bb;t=fixo;c=outros;v<0\")")
-def list_forecasts(budget_id, project_id, show_id, filter_expr):
+@click.option("--screen", "-s", is_flag=True, default=False, help="fit table to screen (100 chars)")
+def list_forecasts(budget_id, project_id, show_id, filter_expr, screen):
     """list all forecasts for a budget. defaults to the current month's budget."""
     async def _run():
         from bud.commands.utils import require_month
@@ -136,7 +137,7 @@ def list_forecasts(budget_id, project_id, show_id, filter_expr):
                 rows = [[i + 1, _display_description(f), f.value, _current_value(f), f.category.name if f.category else "", ", ".join(f.tags) if f.tags else "", _recurrence_label(f)] for i, f in enumerate(items)]
                 headers = ["#", "description", "value", "current", "category", "tags", "recurrence"]
                 col_types = ["num", "text", "num", "num", "text", "tag", "text"]
-            click.echo(format_table(headers, rows, col_types))
+            click.echo(format_table(headers, rows, col_types, screen=screen))
 
     run_async(_run())
 

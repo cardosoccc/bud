@@ -55,9 +55,10 @@ def _filtered_recurrences(items, filter_expr):
 @click.argument("month", default=None, required=False)
 @click.option("--all", "-a", "show_all", is_flag=True, default=False, help="show all recurrences")
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
-@click.option("--show-id", "-s", is_flag=True, default=False, help="show recurrence uuids")
+@click.option("--show-id", is_flag=True, default=False, help="show recurrence uuids")
 @click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (e.g. \"a=bb;t=fixo;c=outros;v<0\")")
-def list_recurrences(month, show_all, project_id, show_id, filter_expr):
+@click.option("--screen", "-s", is_flag=True, default=False, help="fit table to screen (100 chars)")
+def list_recurrences(month, show_all, project_id, show_id, filter_expr, screen):
     """list recurrences. defaults to those active in the current month."""
     async def _run():
         async with get_session() as db:
@@ -90,7 +91,7 @@ def list_recurrences(month, show_all, project_id, show_id, filter_expr):
                 ]
                 headers = ["#", "description", "value", "category", "tags", "start", "end", "installments"]
                 col_types = ["num", "text", "num", "text", "tag", "text", "text", "num"]
-            click.echo(format_table(headers, rows, col_types))
+            click.echo(format_table(headers, rows, col_types, screen=screen))
 
     run_async(_run())
 

@@ -1,7 +1,9 @@
-"""Constrained-width table formatter.
+"""Table formatter with optional screen-width constraint.
 
-All tables are rendered within MAX_WIDTH characters.
-Column truncation priority:
+By default tables are rendered at full (natural) width.  Pass
+``screen=True`` to constrain output to MAX_WIDTH characters.
+
+Column truncation priority (screen mode only):
   1. Numeric columns ("num") — never truncated, always fully visible
   2. Tag columns ("tag") — ellipsed first
   3. Text columns ("text") — use remaining space, ellipsed if needed
@@ -12,8 +14,8 @@ from decimal import Decimal
 MAX_WIDTH = 100
 
 
-def format_table(headers, rows, col_types=None):
-    """Format *rows* under *headers* fitting within MAX_WIDTH.
+def format_table(headers, rows, col_types=None, screen=False):
+    """Format *rows* under *headers*.
 
     Parameters
     ----------
@@ -23,6 +25,10 @@ def format_table(headers, rows, col_types=None):
     col_types : list[str] | None
         Per-column type hint — ``"num"``, ``"id"``, ``"tag"``, or ``"text"``
         (default).  ``"id"`` columns are never truncated but left-aligned.
+    screen : bool
+        When *True*, constrain the table to MAX_WIDTH characters (the
+        previous default behaviour).  When *False* (default), columns use
+        their natural width with no truncation.
     """
     n = len(headers)
     if col_types is None:
@@ -44,16 +50,19 @@ def format_table(headers, rows, col_types=None):
         for j, val in enumerate(row):
             natural[j] = max(natural[j], len(val))
 
-    # Overhead per column: 2 chars padding (1 left + 1 right).
-    # Between columns: 1 char for "|".
-    # Total overhead = 2*n + (n-1) = 3n - 1
-    overhead = 3 * n - 1
-    available = MAX_WIDTH - overhead
+    if screen:
+        # Overhead per column: 2 chars padding (1 left + 1 right).
+        # Between columns: 1 char for "|".
+        # Total overhead = 2*n + (n-1) = 3n - 1
+        overhead = 3 * n - 1
+        available = MAX_WIDTH - overhead
 
-    if sum(natural) <= available:
-        widths = natural[:]
+        if sum(natural) <= available:
+            widths = natural[:]
+        else:
+            widths = _compute_widths(headers, natural, col_types, available)
     else:
-        widths = _compute_widths(headers, natural, col_types, available)
+        widths = natural[:]
 
     # --- render ----------------------------------------------------------
     return _render(headers, str_rows, widths, col_types)

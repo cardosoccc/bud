@@ -14,8 +14,9 @@ def budget():
 
 @budget.command("list")
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
-@click.option("--show-id", "-s", is_flag=True, default=False, help="show budget uuids")
-def list_budgets(project_id, show_id):
+@click.option("--show-id", is_flag=True, default=False, help="show budget uuids")
+@click.option("--screen", "-s", is_flag=True, default=False, help="fit table to screen (100 chars)")
+def list_budgets(project_id, show_id, screen):
     """list all budgets for a project."""
     async def _run():
         async with get_session() as db:
@@ -36,7 +37,7 @@ def list_budgets(project_id, show_id):
                 rows = [[i + 1, b.name, str(b.start_date), str(b.end_date)] for i, b in enumerate(items)]
                 headers = ["#", "month", "start", "end"]
                 col_types = ["num", "text", "text", "text"]
-            click.echo(format_table(headers, rows, col_types))
+            click.echo(format_table(headers, rows, col_types, screen=screen))
 
     run_async(_run())
 
