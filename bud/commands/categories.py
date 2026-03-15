@@ -14,8 +14,9 @@ def category():
 
 
 @category.command("list")
-@click.option("--show-id", "-s", is_flag=True, default=False, help="show category uuids")
-def list_categories(show_id):
+@click.option("--show-id", is_flag=True, default=False, help="show category uuids")
+@click.option("--screen", "-s", is_flag=True, default=False, help="fit table to screen (100 chars)")
+def list_categories(show_id, screen):
     """list all categories."""
     async def _run():
         async with get_session() as db:
@@ -32,7 +33,7 @@ def list_categories(show_id):
                 rows = [[i + 1, c.name] for i, c in enumerate(items)]
                 headers = ["#", "name"]
                 col_types = ["num", "text"]
-            click.echo(format_table(headers, rows, col_types))
+            click.echo(format_table(headers, rows, col_types, screen=screen))
 
     run_async(_run())
 

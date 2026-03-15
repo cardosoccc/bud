@@ -27,9 +27,10 @@ def _filtered_transactions(items, filter_expr):
 @transaction.command("list")
 @click.argument("month", default=None, required=False)
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
-@click.option("--show-id", "-s", is_flag=True, default=False, help="show transaction uuids")
+@click.option("--show-id", is_flag=True, default=False, help="show transaction uuids")
 @click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (e.g. \"a=bb;t=fixo;c=outros;v<0\")")
-def list_transactions(month, project_id, show_id, filter_expr):
+@click.option("--screen", "-s", is_flag=True, default=False, help="fit table to screen (100 chars)")
+def list_transactions(month, project_id, show_id, filter_expr, screen):
     """list transactions for a given month."""
     async def _run():
         async with get_session() as db:
@@ -59,7 +60,7 @@ def list_transactions(month, project_id, show_id, filter_expr):
                 ]
                 headers = ["#", "date", "description", "value", "category", "tags", "account"]
                 col_types = ["num", "text", "text", "num", "text", "tag", "text"]
-            click.echo(format_table(headers, rows, col_types))
+            click.echo(format_table(headers, rows, col_types, screen=screen))
 
     run_async(_run())
 
