@@ -8,43 +8,51 @@ from bud.commands.db import get_session, run_async
 from bud.commands.utils import resolve_project_id, resolve_budget_id, is_uuid
 from bud.services import reports as report_service
 
-# Table 1: 4 cols, 5 separators → inner = 115
-# | Account (43) | Calculated Balance (24) | Current Balance (24) | Difference (24) |
-_T1_WIDTHS = [79, 12, 12, 12]
+from bud.commands.table_format import format_table, _to_str, _render
+
 _T1_HEADERS = ["account", "calculated", "current", "difference"]
-_T1_NUM = [False, True, True, True]
+_T1_COL_TYPES = ["text", "num", "num", "num"]
 
-# Table 2: 6 cols, 7 separators → inner = 113
-# | Description (40) | Category (12) | Tags (25) | Forecast (12) | Current (12) | Remaining (12) |
-_T2_WIDTHS = [37, 15, 25, 12, 12, 12]
 _T2_HEADERS = ["description", "category", "tags", "forecast", "current", "remaining"]
-_T2_NUM = [False, False, False, True, True, True]
+_T2_COL_TYPES = ["text", "text", "tag", "num", "num", "num"]
 
 
-def _fmt_cell(val, width, numeric):
-    inner = width - 2
-    if numeric and val != "":
-        s = f"{float(val):.2f}"
-        return f" {s:>{inner}} "
-    s = str(val)
-    if len(s) > inner:
-        s = s[: inner - 3] + "..."
-    return f" {s:<{inner}} "
+def _fmt_row(values, col_types):
+    """Format a single row using the shared renderer (for totals / special rows)."""
+    str_vals = [_to_str(v, ct) for v, ct in zip(values, col_types)]
+    # Compute widths from just this row (caller will join with table output)
+    widths = [max(len(s), 4) for s in str_vals]
+    return _render([], [str_vals], widths, col_types).split("\n")[-1]
 
 
-def _fmt_row(values, widths, numeric):
-    return "|".join(_fmt_cell(v, w, n) for v, w, n in zip(values, widths, numeric))
+def _build_report_table(headers, rows, col_types):
+    """Build a report table and return (table_str, separator, col_types) for appending extra rows."""
+    return format_table(headers, rows, col_types)
 
 
-def _separator(widths):
-    return "+".join("-" * w for w in widths)
+def _report_extra_row(values, col_types, ref_table):
+    """Format an extra row (total, expected, etc.) matching the widths of a rendered table."""
+    # Extract widths from the separator line of the reference table
+    sep_line = ref_table.split("\n")[1]
+    widths = [len(seg) - 2 for seg in sep_line.split("+")]
+    str_vals = [_to_str(v, ct) for v, ct in zip(values, col_types)]
+
+    def _cell(val, width, is_num):
+        if is_num:
+            return f" {val:>{width}} "
+        if len(val) > width:
+            val = val[: width - 3] + "..." if width > 3 else val[:width]
+        return f" {val:<{width}} "
+
+    return "|".join(
+        _cell(v, widths[j], col_types[j] == "num")
+        for j, v in enumerate(str_vals)
+    )
 
 
-def _build_table(headers, rows, widths, numeric):
-    lines = [_fmt_row(headers, widths, [False] * len(widths)), _separator(widths)]
-    for row in rows:
-        lines.append(_fmt_row(row, widths, numeric))
-    return "\n".join(lines)
+def _report_separator(ref_table):
+    """Extract the separator line from a rendered table."""
+    return ref_table.split("\n")[1]
 
 
 @click.command()
@@ -81,9 +89,9 @@ def report(budget_id, project_id):
                 return
 
             click.echo(f"\n# {r.budget_name} ({r.start_date} / {r.end_date})\n")
-            click.echo("-" * 118)
+            click.echo("-" * 100)
             click.echo("## balances")
-            click.echo("-" * 118)
+            click.echo("-" * 100)
             total_remaining = sum(f.difference for f in r.forecasts) if r.forecasts else Decimal("0")
 
             if r.account_balances:
@@ -92,13 +100,13 @@ def report(budget_id, project_id):
                 total_curr = sum(b.current_balance for b in r.account_balances)
                 total_diff = sum(b.difference for b in r.account_balances)
 
-                table = _build_table(_T1_HEADERS, rows, _T1_WIDTHS, _T1_NUM)
-                sep = _separator(_T1_WIDTHS)
-                total_row = _fmt_row(["total", total_calc, total_curr, total_diff], _T1_WIDTHS, _T1_NUM)
+                table = _build_report_table(_T1_HEADERS, rows, _T1_COL_TYPES)
+                sep = _report_separator(table)
+                total_row = _report_extra_row(["total", total_calc, total_curr, total_diff], _T1_COL_TYPES, table)
                 acc_remaining = r.accumulated_remaining if r.accumulated_remaining is not None else total_remaining
                 exp_calc = total_calc + acc_remaining
                 exp_curr = total_curr + acc_remaining
-                expected_row = _fmt_row(["expected", exp_calc, exp_curr, total_diff], _T1_WIDTHS, _T1_NUM)
+                expected_row = _report_extra_row(["expected", exp_calc, exp_curr, total_diff], _T1_COL_TYPES, table)
                 click.echo(f"{table}\n{sep}\n{total_row}\n{sep}\n{expected_row}")
 
             if r.forecasts or (r.is_projected and r.accumulated_remaining is not None):
@@ -117,20 +125,20 @@ def report(budget_id, project_id):
                 total_forecasted = sum(f.forecast_value for f in r.forecasts)
                 total_current = sum(f.actual_value for f in r.forecasts)
 
-                table = _build_table(_T2_HEADERS, rows, _T2_WIDTHS, _T2_NUM)
-                sep = _separator(_T2_WIDTHS)
-                total_row = _fmt_row(["total", "", "", total_forecasted, total_current, total_remaining], _T2_WIDTHS, _T2_NUM)
+                table = _build_report_table(_T2_HEADERS, rows, _T2_COL_TYPES)
+                sep = _report_separator(table)
+                total_row = _report_extra_row(["total", "", "", total_forecasted, total_current, total_remaining], _T2_COL_TYPES, table)
                 click.echo("\n")
-                click.echo("-" * 118)
+                click.echo("-" * 100)
                 click.echo("## forecasts")
-                click.echo("-" * 118)
+                click.echo("-" * 100)
                 output = f"{table}\n{sep}\n{total_row}"
 
                 is_future = r.start_date > date.today()
                 if is_future and r.accumulated_remaining is not None:
                     prev_remaining = r.accumulated_remaining - total_remaining
-                    prev_row = _fmt_row(["previous", "", "", "", "", prev_remaining], _T2_WIDTHS, _T2_NUM)
-                    acc_row = _fmt_row(["accumulated", "", "", "", "", r.accumulated_remaining], _T2_WIDTHS, _T2_NUM)
+                    prev_row = _report_extra_row(["previous", "", "", "", "", prev_remaining], _T2_COL_TYPES, table)
+                    acc_row = _report_extra_row(["accumulated", "", "", "", "", r.accumulated_remaining], _T2_COL_TYPES, table)
                     output += f"\n{sep}\n{prev_row}\n{sep}\n{acc_row}"
 
                 click.echo(output)

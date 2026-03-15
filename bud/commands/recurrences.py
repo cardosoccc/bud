@@ -1,8 +1,6 @@
 import uuid
 
 import click
-from tabulate import tabulate
-
 from bud.commands.db import get_session, run_async
 from bud.commands.utils import resolve_project_id, resolve_category_id, is_uuid, with_auto_push
 from bud.filter import apply_filter
@@ -71,6 +69,7 @@ def list_recurrences(month, show_all, project_id, show_id, filter_expr):
                 click.echo("no recurrences found.")
                 return
 
+            from bud.commands.table_format import format_table
             if show_id:
                 rows = [
                     [i + 1, str(r.id), r.base_description or "", r.value,
@@ -80,6 +79,7 @@ def list_recurrences(month, show_all, project_id, show_id, filter_expr):
                     for i, r in enumerate(items)
                 ]
                 headers = ["#", "id", "description", "value", "category", "tags", "start", "end", "installments"]
+                col_types = ["num", "id", "text", "num", "text", "tag", "text", "text", "num"]
             else:
                 rows = [
                     [i + 1, r.base_description or "", r.value,
@@ -89,7 +89,8 @@ def list_recurrences(month, show_all, project_id, show_id, filter_expr):
                     for i, r in enumerate(items)
                 ]
                 headers = ["#", "description", "value", "category", "tags", "start", "end", "installments"]
-            click.echo(tabulate(rows, headers=headers, tablefmt="presto", floatfmt=".2f"))
+                col_types = ["num", "text", "num", "text", "tag", "text", "text", "num"]
+            click.echo(format_table(headers, rows, col_types))
 
     run_async(_run())
 

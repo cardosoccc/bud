@@ -1,7 +1,5 @@
 import uuid
 import click
-from tabulate import tabulate
-
 from bud.commands.db import get_session, run_async
 from bud.commands.utils import resolve_project_id, resolve_account_id, is_uuid, with_auto_push
 from bud.models.account import AccountType
@@ -33,15 +31,22 @@ def list_accounts(project_id, show_id, show_type, show_initial_balance):
                 click.echo("no accounts found.")
                 return
             items = sorted(items, key=lambda a: a.name.lower())
+            from bud.commands.table_format import format_table
             headers = ["#"]
+            col_types = ["num"]
             if show_id:
                 headers.append("id")
+                col_types.append("id")
             headers.append("name")
+            col_types.append("text")
             if show_type:
                 headers.append("type")
+                col_types.append("text")
             if show_initial_balance:
                 headers.append("initial balance")
+                col_types.append("num")
             headers.append("current balance")
+            col_types.append("num")
             rows = []
             for i, a in enumerate(items):
                 row = [i + 1]
@@ -54,7 +59,7 @@ def list_accounts(project_id, show_id, show_type, show_initial_balance):
                     row.append(float(a.initial_balance))
                 row.append(float(a.current_balance))
                 rows.append(row)
-            click.echo(tabulate(rows, headers=headers, tablefmt="presto", floatfmt=".2f"))
+            click.echo(format_table(headers, rows, col_types))
 
     run_async(_run())
 

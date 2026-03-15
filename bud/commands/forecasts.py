@@ -2,8 +2,6 @@ import uuid
 from decimal import Decimal
 
 import click
-from tabulate import tabulate
-
 from bud.commands.db import get_session, run_async
 from bud.commands.utils import resolve_project_id, resolve_category_id, resolve_budget_id, is_uuid, with_auto_push
 from bud.filter import apply_filter
@@ -129,13 +127,16 @@ def list_forecasts(budget_id, project_id, show_id, filter_expr):
             def _current_value(f):
                 return forecast_service.compute_forecast_actual(f, transactions)
 
+            from bud.commands.table_format import format_table
             if show_id:
                 rows = [[i + 1, str(f.id), _display_description(f), f.value, _current_value(f), f.category.name if f.category else "", ", ".join(f.tags) if f.tags else "", _recurrence_label(f)] for i, f in enumerate(items)]
                 headers = ["#", "id", "description", "value", "current", "category", "tags", "recurrence"]
+                col_types = ["num", "id", "text", "num", "num", "text", "tag", "text"]
             else:
                 rows = [[i + 1, _display_description(f), f.value, _current_value(f), f.category.name if f.category else "", ", ".join(f.tags) if f.tags else "", _recurrence_label(f)] for i, f in enumerate(items)]
                 headers = ["#", "description", "value", "current", "category", "tags", "recurrence"]
-            click.echo(tabulate(rows, headers=headers, tablefmt="presto", floatfmt=".2f"))
+                col_types = ["num", "text", "num", "num", "text", "tag", "text"]
+            click.echo(format_table(headers, rows, col_types))
 
     run_async(_run())
 

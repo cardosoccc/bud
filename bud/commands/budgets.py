@@ -1,7 +1,5 @@
 import uuid
 import click
-from tabulate import tabulate
-
 from bud.commands.db import get_session, run_async
 from bud.commands.utils import resolve_project_id, resolve_budget_id, is_uuid, with_auto_push
 from bud.schemas.budget import BudgetCreate, BudgetUpdate
@@ -29,13 +27,16 @@ def list_budgets(project_id, show_id):
             if not items:
                 click.echo("no budgets found.")
                 return
+            from bud.commands.table_format import format_table
             if show_id:
                 rows = [[i + 1, str(b.id), b.name, str(b.start_date), str(b.end_date)] for i, b in enumerate(items)]
                 headers = ["#", "id", "month", "start", "end"]
+                col_types = ["num", "id", "text", "text", "text"]
             else:
                 rows = [[i + 1, b.name, str(b.start_date), str(b.end_date)] for i, b in enumerate(items)]
                 headers = ["#", "month", "start", "end"]
-            click.echo(tabulate(rows, headers=headers, tablefmt="presto"))
+                col_types = ["num", "text", "text", "text"]
+            click.echo(format_table(headers, rows, col_types))
 
     run_async(_run())
 
