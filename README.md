@@ -153,6 +153,14 @@ A recurrence is a dedicated record that tracks a repeating forecast across month
 - Use `bud r e <counter> --all -d "New Name" --propagate` to edit a recurrence and propagate changes to all linked forecasts.
 - Use `bud r d <counter> --all --cascade -y` to delete a recurrence and all its linked forecasts.
 
+**Adjusting a forecast to match actuals:**
+- Use `bud f e <counter> --adjust` (or `-a`) to set a forecast's value to the sum of its currently matched transactions — the same "current" value shown in `bud ff` and `bud s`.
+- This only changes the selected forecast. It does **not** modify the related recurrence or any other forecasts linked to the same recurrence.
+- `--adjust` and `--value` cannot be used together.
+
+**Listing forecasts (`bud ff`):**
+- The list includes a `current` column showing the sum of transactions that match each forecast (using the same matching logic as the status report).
+
 **Editing recurrent forecasts:**
 - A non-recurrent forecast can be turned into an open-ended recurrence via `--recurrent` (and optionally `--recurrence-end`) on the edit command. Turning into an installment-based recurrence via edit is not supported.
 - Editing the description of a recurrent forecast also updates the recurrence's base description.
@@ -289,7 +297,7 @@ bud f l [BUDGET]                  # list forecasts (BUDGET = UUID or YYYY-MM, de
 bud f l -f "t=fixo"               # list only forecasts tagged "fixo"
 bud f l -f "t=fixo,moradia;v<0"   # filter by tags AND value
 bud f c [BUDGET] -v <amount> [-d <desc>] [-c <category>] [-t <tags>] [-r] [-e <end>] [-i <N>]
-bud f e <counter> [BUDGET] [-d <desc>] [-v <amount>] [-c <category>] [-t <tags>] [-r] [-e <end>]
+bud f e <counter> [BUDGET] [-d <desc>] [-v <amount>] [-c <category>] [-t <tags>] [-r] [-e <end>] [-a]
 bud f d <id-or-counter> [BUDGET] [-y]
 ```
 

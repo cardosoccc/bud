@@ -49,7 +49,7 @@ comandos de duas letras listam um recurso diretamente: `tt` (transacoes), `ff` (
 
 ### aliases de opcoes comuns
 
-`-v` valor, `-d` descricao, `-p` projeto, `-c` categoria, `-t` tags (ou data em transacoes), `-a` conta (ou --all em recorrencias), `-s` mostrar-id, `-n` nome, `-y` sim (pular confirmacao), `-r` recorrente, `-e` fim-recorrencia, `-i` parcelas, `-f` filtro (em list/edit/delete) ou previsao (em `t c`).
+`-v` valor, `-d` descricao, `-p` projeto, `-c` categoria, `-t` tags (ou data em transacoes), `-a` conta (ou --all em recorrencias, ou --adjust em `f e`), `-s` mostrar-id, `-n` nome, `-y` sim (pular confirmacao), `-r` recorrente, `-e` fim-recorrencia, `-i` parcelas, `-f` filtro (em list/edit/delete) ou previsao (em `t c`).
 
 ## fluxo de configuracao
 
@@ -131,7 +131,7 @@ bud f c -v -300 -d "maquina de lavar" -c eletrodomesticos -i 10
 # registrar compra ja na 5a parcela (cria parcelas 5-10)
 bud f c -v -300 -d "maquina de lavar" -c eletrodomesticos -i 10 --current-installment 5
 
-# listar previsoes do mes atual
+# listar previsoes do mes atual (inclui coluna "current" com valor real das transacoes correspondentes)
 bud ff
 
 # filtrar previsoes com DSL
@@ -140,6 +140,10 @@ bud ff -f "t=fixo,moradia;v<0"
 
 # editar previsao #2 do mes atual
 bud f e 2 -v -250
+
+# ajustar previsao para igualar ao valor atual das transacoes correspondentes
+bud f e 2 -a
+bud f e 2 --adjust
 
 # transformar previsao nao-recorrente em recorrencia
 bud f e 3 -r
