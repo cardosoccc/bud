@@ -1,6 +1,6 @@
 """Unit tests for the transactions service layer."""
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 import pytest
@@ -206,6 +206,26 @@ async def test_list_transactions_ordered_by_date_desc(db_session: AsyncSession):
     assert result[0].description == "Late"
     assert result[1].description == "Middle"
     assert result[2].description == "Early"
+
+
+@pytest.mark.asyncio
+async def test_list_transactions_same_date_ordered_by_insertion_desc(db_session: AsyncSession):
+    project = await _create_project(db_session)
+    account = await _create_account(db_session, project.id)
+    t1 = await _create_transaction(db_session, project.id, account.id, description="First", txn_date=date(2025, 1, 10))
+    t2 = await _create_transaction(db_session, project.id, account.id, description="Second", txn_date=date(2025, 1, 10))
+    t3 = await _create_transaction(db_session, project.id, account.id, description="Third", txn_date=date(2025, 1, 10))
+    # Explicitly set created_at to guarantee distinct timestamps for ordering
+    t1.created_at = datetime(2025, 1, 10, 10, 0, 0, tzinfo=timezone.utc)
+    t2.created_at = datetime(2025, 1, 10, 11, 0, 0, tzinfo=timezone.utc)
+    t3.created_at = datetime(2025, 1, 10, 12, 0, 0, tzinfo=timezone.utc)
+    await db_session.flush()
+
+    result = await transaction_service.list_transactions(db_session, project.id, month="2025-01")
+
+    assert result[0].description == "Third"
+    assert result[1].description == "Second"
+    assert result[2].description == "First"
 
 
 @pytest.mark.asyncio

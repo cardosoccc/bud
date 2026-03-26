@@ -34,7 +34,7 @@ async def list_transactions(
         select(Transaction)
         .options(selectinload(Transaction.account), selectinload(Transaction.category))
         .where(and_(*conditions))
-        .order_by(Transaction.date.desc())
+        .order_by(Transaction.date.desc(), Transaction.created_at.desc())
     )
     return list(result.scalars().all())
 
