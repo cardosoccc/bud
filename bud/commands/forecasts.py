@@ -105,6 +105,8 @@ def list_forecasts(budget_id, project_id, show_id, filter_expr, screen):
                     return
             items = await forecast_service.list_forecasts(db, bid)
             items = _filtered_forecasts(items, filter_expr)
+            if items:
+                items.sort(key=lambda f: 0 if _forecast_description(f) else 1)
             if not items:
                 click.echo("no forecasts found.")
                 return
@@ -130,13 +132,13 @@ def list_forecasts(budget_id, project_id, show_id, filter_expr, screen):
 
             from bud.commands.table_format import format_table
             if show_id:
-                rows = [[i + 1, str(f.id), _display_description(f), f.value, _current_value(f), f.category.name if f.category else "", ", ".join(f.tags) if f.tags else "", _recurrence_label(f)] for i, f in enumerate(items)]
-                headers = ["#", "id", "description", "value", "current", "category", "tags", "recurrence"]
-                col_types = ["num", "id", "text", "num", "num", "text", "tag", "text"]
+                rows = [[i + 1, str(f.id), _display_description(f), f.value, _current_value(f), f.value - _current_value(f), f.category.name if f.category else "", ", ".join(f.tags) if f.tags else "", _recurrence_label(f)] for i, f in enumerate(items)]
+                headers = ["#", "id", "description", "forecast", "current", "diff", "category", "tags", "recurrence"]
+                col_types = ["num", "id", "text", "num", "num", "num", "text", "tag", "text"]
             else:
-                rows = [[i + 1, _display_description(f), f.value, _current_value(f), f.category.name if f.category else "", ", ".join(f.tags) if f.tags else "", _recurrence_label(f)] for i, f in enumerate(items)]
-                headers = ["#", "description", "value", "current", "category", "tags", "recurrence"]
-                col_types = ["num", "text", "num", "num", "text", "tag", "text"]
+                rows = [[i + 1, _display_description(f), f.value, _current_value(f), f.value - _current_value(f), f.category.name if f.category else "", ", ".join(f.tags) if f.tags else "", _recurrence_label(f)] for i, f in enumerate(items)]
+                headers = ["#", "description", "forecast", "current", "diff", "category", "tags", "recurrence"]
+                col_types = ["num", "text", "num", "num", "num", "text", "tag", "text"]
             click.echo(format_table(headers, rows, col_types, screen=screen))
 
     run_async(_run())
