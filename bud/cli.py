@@ -12,7 +12,7 @@ from bud.commands.reports import report
 from bud.commands.recurrences import recurrence
 from bud.commands.credentials import configure_aws, configure_gcp
 from bud.commands.db_commands import db
-from bud.commands.config_store import set_config_value
+from bud.commands.config_store import set_active_user, set_config_value
 
 
 def _list_alias(list_cmd: click.Command, alias_for: str, resource: str) -> click.Command:
@@ -64,9 +64,11 @@ def _add_visible_alias(group: click.Group, cmd: click.Command, alias: str, canon
 
 
 @click.group()
-def cli():
+@click.option("--user", "-u", envvar="BUD_USER", default="default",
+              help="User profile name (default: 'default').")
+def cli(user):
     """bud - budget management cli."""
-    pass
+    set_active_user(user)
 
 
 cli.add_command(project)

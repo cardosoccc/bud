@@ -9,23 +9,27 @@ from pathlib import Path
 
 import click
 
-from bud.commands.config_store import CONFIG_DIR, DB_PATH, get_config_value
+from bud.commands.config_store import get_config_dir, get_db_path, get_config_value
 
-SYNC_META_FILE = CONFIG_DIR / "sync_meta.json"
 REMOTE_DB_KEY = "bud.db"
 REMOTE_META_KEY = "sync_meta.json"
 
 
+def _get_sync_meta_file() -> Path:
+    return get_config_dir() / "sync_meta.json"
+
+
 def _load_local_meta() -> dict:
-    if SYNC_META_FILE.exists():
-        with open(SYNC_META_FILE) as f:
+    meta_file = _get_sync_meta_file()
+    if meta_file.exists():
+        with open(meta_file) as f:
             return json.load(f)
     return {"version": 0}
 
 
 def _save_local_meta(meta: dict) -> None:
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    with open(SYNC_META_FILE, "w") as f:
+    get_config_dir().mkdir(parents=True, exist_ok=True)
+    with open(_get_sync_meta_file(), "w") as f:
         json.dump(meta, f, indent=2)
 
 
@@ -62,7 +66,8 @@ def run_push(force: bool = False) -> bool:
     """
     from bud.services.storage import get_provider
 
-    if not DB_PATH.exists():
+    db_path = get_db_path()
+    if not db_path.exists():
         click.echo("error: local database does not exist. run `bud db init` first.", err=True)
         return False
 
@@ -90,7 +95,7 @@ def run_push(force: bool = False) -> bool:
     new_version = max(local_version, remote_version) + 1
     new_meta = {"version": new_version, "pushed_at": time.time()}
 
-    provider.upload(DB_PATH, REMOTE_DB_KEY)
+    provider.upload(db_path, REMOTE_DB_KEY)
     provider.upload_json(new_meta, REMOTE_META_KEY)
     _save_local_meta(new_meta)
 
@@ -143,13 +148,14 @@ def pull(force: bool) -> None:
             )
             sys.exit(1)
 
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        get_config_dir().mkdir(parents=True, exist_ok=True)
 
-        if DB_PATH.exists():
-            backup = DB_PATH.with_suffix(".db.bak")
-            shutil.copy2(DB_PATH, backup)
+        db_path = get_db_path()
+        if db_path.exists():
+            backup = db_path.with_suffix(".db.bak")
+            shutil.copy2(db_path, backup)
 
-        provider.download(REMOTE_DB_KEY, DB_PATH)
+        provider.download(REMOTE_DB_KEY, db_path)
         _save_local_meta(remote_meta)
 
         click.echo(f"pulled database from {bucket_url} (version {remote_version}).")

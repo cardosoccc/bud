@@ -24,37 +24,25 @@ from bud.services.storage import CloudAuthError
 
 
 class TestCredentialStore:
-    def test_save_and_load(self, tmp_path, monkeypatch):
-        creds_file = tmp_path / "credentials.json"
-        monkeypatch.setattr("bud.credentials.CREDENTIALS_FILE", creds_file)
-        monkeypatch.setattr("bud.credentials.CONFIG_DIR", tmp_path)
-
+    def test_save_and_load(self, tmp_path):
+        # _BUD_ROOT patched to tmp_path by conftest; creds go to users/default/
         save_credentials({"aws_access_key_id": "AKID", "aws_secret_access_key": "SECRET"})
 
         loaded = load_credentials()
         assert loaded["aws_access_key_id"] == "AKID"
         assert loaded["aws_secret_access_key"] == "SECRET"
 
-    def test_file_permissions(self, tmp_path, monkeypatch):
-        creds_file = tmp_path / "credentials.json"
-        monkeypatch.setattr("bud.credentials.CREDENTIALS_FILE", creds_file)
-        monkeypatch.setattr("bud.credentials.CONFIG_DIR", tmp_path)
-
+    def test_file_permissions(self, tmp_path):
         save_credentials({"key": "value"})
+        creds_file = tmp_path / "users" / "default" / "credentials.json"
         mode = os.stat(creds_file).st_mode & 0o777
         assert mode == 0o600
 
-    def test_load_missing_file(self, tmp_path, monkeypatch):
-        creds_file = tmp_path / "does_not_exist.json"
-        monkeypatch.setattr("bud.credentials.CREDENTIALS_FILE", creds_file)
-
+    def test_load_missing_file(self, tmp_path):
+        # No credentials file exists yet
         assert load_credentials() == {}
 
-    def test_set_credential(self, tmp_path, monkeypatch):
-        creds_file = tmp_path / "credentials.json"
-        monkeypatch.setattr("bud.credentials.CREDENTIALS_FILE", creds_file)
-        monkeypatch.setattr("bud.credentials.CONFIG_DIR", tmp_path)
-
+    def test_set_credential(self, tmp_path):
         set_credential("aws_access_key_id", "MYKEY")
         set_credential("aws_secret_access_key", "MYSECRET")
 
@@ -62,31 +50,19 @@ class TestCredentialStore:
         assert loaded["aws_access_key_id"] == "MYKEY"
         assert loaded["aws_secret_access_key"] == "MYSECRET"
 
-    def test_get_aws_credentials_present(self, tmp_path, monkeypatch):
-        creds_file = tmp_path / "credentials.json"
-        monkeypatch.setattr("bud.credentials.CREDENTIALS_FILE", creds_file)
-        monkeypatch.setattr("bud.credentials.CONFIG_DIR", tmp_path)
-
+    def test_get_aws_credentials_present(self, tmp_path):
         save_credentials({"aws_access_key_id": "AK", "aws_secret_access_key": "SK"})
         result = get_aws_credentials()
         assert result == ("AK", "SK")
 
-    def test_get_aws_credentials_missing(self, tmp_path, monkeypatch):
-        creds_file = tmp_path / "credentials.json"
-        monkeypatch.setattr("bud.credentials.CREDENTIALS_FILE", creds_file)
+    def test_get_aws_credentials_missing(self, tmp_path):
         assert get_aws_credentials() is None
 
-    def test_get_gcp_credentials_path_present(self, tmp_path, monkeypatch):
-        creds_file = tmp_path / "credentials.json"
-        monkeypatch.setattr("bud.credentials.CREDENTIALS_FILE", creds_file)
-        monkeypatch.setattr("bud.credentials.CONFIG_DIR", tmp_path)
-
+    def test_get_gcp_credentials_path_present(self, tmp_path):
         save_credentials({"gcp_service_account_key_file": "/tmp/sa.json"})
         assert get_gcp_credentials_path() == "/tmp/sa.json"
 
-    def test_get_gcp_credentials_path_missing(self, tmp_path, monkeypatch):
-        creds_file = tmp_path / "credentials.json"
-        monkeypatch.setattr("bud.credentials.CREDENTIALS_FILE", creds_file)
+    def test_get_gcp_credentials_path_missing(self, tmp_path):
         assert get_gcp_credentials_path() is None
 
 
@@ -96,26 +72,19 @@ class TestCredentialStore:
 
 
 class TestConfigureAWS:
-    def test_configure_aws_interactive(self, tmp_path, monkeypatch):
-        creds_file = tmp_path / "credentials.json"
-        monkeypatch.setattr("bud.credentials.CREDENTIALS_FILE", creds_file)
-        monkeypatch.setattr("bud.credentials.CONFIG_DIR", tmp_path)
-
+    def test_configure_aws_interactive(self, tmp_path):
         runner = CliRunner()
         result = runner.invoke(cli, ["config", "aws"], input="AKID123\nSECRET456\n")
 
         assert result.exit_code == 0
         assert "aws credentials saved" in result.output
 
+        creds_file = tmp_path / "users" / "default" / "credentials.json"
         loaded = json.loads(creds_file.read_text())
         assert loaded["aws_access_key_id"] == "AKID123"
         assert loaded["aws_secret_access_key"] == "SECRET456"
 
-    def test_configure_aws_with_options(self, tmp_path, monkeypatch):
-        creds_file = tmp_path / "credentials.json"
-        monkeypatch.setattr("bud.credentials.CREDENTIALS_FILE", creds_file)
-        monkeypatch.setattr("bud.credentials.CONFIG_DIR", tmp_path)
-
+    def test_configure_aws_with_options(self, tmp_path):
         runner = CliRunner()
         result = runner.invoke(
             cli,
@@ -123,17 +92,14 @@ class TestConfigureAWS:
         )
 
         assert result.exit_code == 0
+        creds_file = tmp_path / "users" / "default" / "credentials.json"
         loaded = json.loads(creds_file.read_text())
         assert loaded["aws_access_key_id"] == "AK"
         assert loaded["aws_secret_access_key"] == "SK"
 
 
 class TestConfigureGCP:
-    def test_configure_gcp_valid_file(self, tmp_path, monkeypatch):
-        creds_file = tmp_path / "credentials.json"
-        monkeypatch.setattr("bud.credentials.CREDENTIALS_FILE", creds_file)
-        monkeypatch.setattr("bud.credentials.CONFIG_DIR", tmp_path)
-
+    def test_configure_gcp_valid_file(self, tmp_path):
         key_file = tmp_path / "sa-key.json"
         key_file.write_text('{"type": "service_account"}')
 
@@ -144,14 +110,11 @@ class TestConfigureGCP:
 
         assert result.exit_code == 0
         assert "gcp credentials saved" in result.output
+        creds_file = tmp_path / "users" / "default" / "credentials.json"
         loaded = json.loads(creds_file.read_text())
         assert loaded["gcp_service_account_key_file"] == str(key_file)
 
-    def test_configure_gcp_missing_file(self, tmp_path, monkeypatch):
-        creds_file = tmp_path / "credentials.json"
-        monkeypatch.setattr("bud.credentials.CREDENTIALS_FILE", creds_file)
-        monkeypatch.setattr("bud.credentials.CONFIG_DIR", tmp_path)
-
+    def test_configure_gcp_missing_file(self, tmp_path):
         runner = CliRunner()
         result = runner.invoke(
             cli, ["config", "gcp", "--key-file", "/nonexistent/path.json"]
@@ -164,27 +127,6 @@ class TestConfigureGCP:
 # ---------------------------------------------------------------------------
 # Auth error handling in push/pull
 # ---------------------------------------------------------------------------
-
-
-class FakeProvider:
-    """In-memory storage provider for testing."""
-
-    def __init__(self):
-        self.files: dict[str, bytes] = {}
-        self.json_objects: dict[str, dict] = {}
-
-    def upload(self, local_path: Path, remote_key: str) -> None:
-        self.files[remote_key] = local_path.read_bytes()
-
-    def download(self, remote_key: str, local_path: Path) -> None:
-        local_path.parent.mkdir(parents=True, exist_ok=True)
-        local_path.write_bytes(self.files[remote_key])
-
-    def read_json(self, remote_key: str):
-        return self.json_objects.get(remote_key)
-
-    def upload_json(self, data: dict, remote_key: str) -> None:
-        self.json_objects[remote_key] = data
 
 
 class FailingProvider:
@@ -215,26 +157,21 @@ class FailingProvider:
 
 
 @pytest.fixture
-def sync_env(tmp_path, monkeypatch):
-    """Set up a temporary .bud directory and config for auth error tests."""
-    bud_dir = tmp_path / ".bud"
-    bud_dir.mkdir()
+def sync_env(tmp_path):
+    """Set up a temporary user directory for auth error tests.
 
-    db_file = bud_dir / "bud.db"
+    _BUD_ROOT is already patched to tmp_path by conftest autouse fixture.
+    """
+    user_dir = tmp_path / "users" / "default"
+    user_dir.mkdir(parents=True)
+
+    db_file = user_dir / "bud.db"
     db_file.write_text("fake-database-content")
 
-    config_file = bud_dir / "config.json"
+    config_file = user_dir / "config.json"
     config_file.write_text(json.dumps({"bucket": "s3://test-bucket/prefix"}))
 
-    sync_meta = bud_dir / "sync_meta.json"
-
-    monkeypatch.setattr("bud.commands.sync.CONFIG_DIR", bud_dir)
-    monkeypatch.setattr("bud.commands.sync.DB_PATH", db_file)
-    monkeypatch.setattr("bud.commands.sync.SYNC_META_FILE", sync_meta)
-    monkeypatch.setattr("bud.commands.config_store.CONFIG_DIR", bud_dir)
-    monkeypatch.setattr("bud.commands.config_store.CONFIG_FILE", config_file)
-
-    return bud_dir, db_file, sync_meta
+    return user_dir, db_file
 
 
 class TestPushAuthError:
@@ -250,10 +187,9 @@ class TestPushAuthError:
         assert "bud configure-aws" in result.output
 
     def test_push_gcp_auth_error(self, sync_env):
-        _, db_file, _ = sync_env
+        user_dir, db_file = sync_env
         # Switch to GCS bucket
-        bud_dir = db_file.parent
-        config_file = bud_dir / "config.json"
+        config_file = user_dir / "config.json"
         config_file.write_text(json.dumps({"bucket": "gs://test-bucket"}))
 
         failing = FailingProvider("GCP", "bud configure-gcp")
@@ -280,9 +216,8 @@ class TestPullAuthError:
         assert "bud configure-aws" in result.output
 
     def test_pull_gcp_auth_error(self, sync_env):
-        _, db_file, _ = sync_env
-        bud_dir = db_file.parent
-        config_file = bud_dir / "config.json"
+        user_dir, db_file = sync_env
+        config_file = user_dir / "config.json"
         config_file.write_text(json.dumps({"bucket": "gs://test-bucket"}))
 
         failing = FailingProvider("GCP", "bud configure-gcp")

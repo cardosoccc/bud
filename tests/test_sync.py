@@ -79,60 +79,45 @@ class FakeProvider:
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
-def setup_env(tmp_path, monkeypatch):
-    """Set up a temporary .bud directory and config for testing."""
-    bud_dir = tmp_path / ".bud"
-    bud_dir.mkdir()
+def setup_env(tmp_path):
+    """Set up a temporary user directory and config for testing.
 
-    db_file = bud_dir / "bud.db"
+    _BUD_ROOT is already patched to tmp_path by conftest autouse fixture.
+    """
+    user_dir = tmp_path / "users" / "default"
+    user_dir.mkdir(parents=True)
+
+    db_file = user_dir / "bud.db"
     db_file.write_text("fake-database-content")
 
-    config_file = bud_dir / "config.json"
+    config_file = user_dir / "config.json"
     config_file.write_text(json.dumps({"bucket": "s3://test-bucket/prefix"}))
 
-    sync_meta = bud_dir / "sync_meta.json"
+    sync_meta = user_dir / "sync_meta.json"
 
-    # Patch all paths used by sync module
-    monkeypatch.setattr("bud.commands.sync.CONFIG_DIR", bud_dir)
-    monkeypatch.setattr("bud.commands.sync.DB_PATH", db_file)
-    monkeypatch.setattr("bud.commands.sync.SYNC_META_FILE", sync_meta)
-    monkeypatch.setattr("bud.commands.config_store.CONFIG_DIR", bud_dir)
-    monkeypatch.setattr("bud.commands.config_store.CONFIG_FILE", config_file)
-
-    return bud_dir, db_file, sync_meta
+    return user_dir, db_file, sync_meta
 
 
 class TestPush:
-    def test_push_no_bucket_configured(self, tmp_path, monkeypatch):
-        bud_dir = tmp_path / ".bud"
-        bud_dir.mkdir()
-        db_file = bud_dir / "bud.db"
+    def test_push_no_bucket_configured(self, tmp_path):
+        user_dir = tmp_path / "users" / "default"
+        user_dir.mkdir(parents=True)
+        db_file = user_dir / "bud.db"
         db_file.write_text("data")
-        config_file = bud_dir / "config.json"
+        config_file = user_dir / "config.json"
         config_file.write_text("{}")
-
-        monkeypatch.setattr("bud.commands.sync.CONFIG_DIR", bud_dir)
-        monkeypatch.setattr("bud.commands.sync.DB_PATH", db_file)
-        monkeypatch.setattr("bud.commands.config_store.CONFIG_DIR", bud_dir)
-        monkeypatch.setattr("bud.commands.config_store.CONFIG_FILE", config_file)
 
         runner = CliRunner()
         result = runner.invoke(cli, ["db", "push"])
         assert result.exit_code != 0
         assert "no bucket configured" in result.output.lower() or "no bucket configured" in (result.output + (result.stderr if hasattr(result, 'stderr') else '')).lower()
 
-    def test_push_no_database(self, tmp_path, monkeypatch):
-        bud_dir = tmp_path / ".bud"
-        bud_dir.mkdir()
-        db_file = bud_dir / "bud.db"  # does not exist
-        config_file = bud_dir / "config.json"
+    def test_push_no_database(self, tmp_path):
+        user_dir = tmp_path / "users" / "default"
+        user_dir.mkdir(parents=True)
+        # bud.db does not exist
+        config_file = user_dir / "config.json"
         config_file.write_text(json.dumps({"bucket": "s3://test-bucket"}))
-
-        monkeypatch.setattr("bud.commands.sync.CONFIG_DIR", bud_dir)
-        monkeypatch.setattr("bud.commands.sync.DB_PATH", db_file)
-        monkeypatch.setattr("bud.commands.sync.SYNC_META_FILE", bud_dir / "sync_meta.json")
-        monkeypatch.setattr("bud.commands.config_store.CONFIG_DIR", bud_dir)
-        monkeypatch.setattr("bud.commands.config_store.CONFIG_FILE", config_file)
 
         runner = CliRunner()
         result = runner.invoke(cli, ["db", "push"])
@@ -140,7 +125,7 @@ class TestPush:
         assert "does not exist" in result.output.lower()
 
     def test_push_first_time(self, setup_env):
-        bud_dir, db_file, sync_meta = setup_env
+        user_dir, db_file, sync_meta = setup_env
         fake = FakeProvider()
 
         with patch("bud.services.storage.get_provider", return_value=fake):
@@ -157,7 +142,7 @@ class TestPush:
         assert local_meta["version"] == 1
 
     def test_push_increments_version(self, setup_env):
-        bud_dir, db_file, sync_meta = setup_env
+        user_dir, db_file, sync_meta = setup_env
         fake = FakeProvider()
         # Simulate a previous push at version 3
         sync_meta.write_text(json.dumps({"version": 3}))
@@ -172,7 +157,7 @@ class TestPush:
         assert fake.json_objects["sync_meta.json"]["version"] == 4
 
     def test_push_blocked_when_remote_newer(self, setup_env):
-        bud_dir, db_file, sync_meta = setup_env
+        user_dir, db_file, sync_meta = setup_env
         fake = FakeProvider()
         sync_meta.write_text(json.dumps({"version": 2}))
         fake.json_objects["sync_meta.json"] = {"version": 5}
@@ -185,7 +170,7 @@ class TestPush:
         assert "newer" in result.output.lower()
 
     def test_push_force_overrides_newer_remote(self, setup_env):
-        bud_dir, db_file, sync_meta = setup_env
+        user_dir, db_file, sync_meta = setup_env
         fake = FakeProvider()
         sync_meta.write_text(json.dumps({"version": 2}))
         fake.json_objects["sync_meta.json"] = {"version": 5}
@@ -202,7 +187,7 @@ class TestPush:
 
 class TestPull:
     def test_pull_no_remote_data(self, setup_env):
-        bud_dir, db_file, sync_meta = setup_env
+        user_dir, db_file, sync_meta = setup_env
         fake = FakeProvider()
 
         with patch("bud.services.storage.get_provider", return_value=fake):
@@ -213,7 +198,7 @@ class TestPull:
         assert "no database found" in result.output.lower()
 
     def test_pull_success(self, setup_env):
-        bud_dir, db_file, sync_meta = setup_env
+        user_dir, db_file, sync_meta = setup_env
         fake = FakeProvider()
         fake.files["bud.db"] = b"remote-database-content"
         fake.json_objects["sync_meta.json"] = {"version": 3, "pushed_at": 1000.0}
@@ -230,7 +215,7 @@ class TestPull:
         assert local_meta["version"] == 3
 
     def test_pull_creates_backup(self, setup_env):
-        bud_dir, db_file, sync_meta = setup_env
+        user_dir, db_file, sync_meta = setup_env
         original_content = db_file.read_text()
         fake = FakeProvider()
         fake.files["bud.db"] = b"new-remote-content"
@@ -246,7 +231,7 @@ class TestPull:
         assert backup.read_text() == original_content
 
     def test_pull_blocked_when_local_newer(self, setup_env):
-        bud_dir, db_file, sync_meta = setup_env
+        user_dir, db_file, sync_meta = setup_env
         sync_meta.write_text(json.dumps({"version": 5}))
         fake = FakeProvider()
         fake.files["bud.db"] = b"remote-data"
@@ -260,7 +245,7 @@ class TestPull:
         assert "newer" in result.output.lower()
 
     def test_pull_force_overrides_newer_local(self, setup_env):
-        bud_dir, db_file, sync_meta = setup_env
+        user_dir, db_file, sync_meta = setup_env
         sync_meta.write_text(json.dumps({"version": 5}))
         fake = FakeProvider()
         fake.files["bud.db"] = b"remote-data-forced"

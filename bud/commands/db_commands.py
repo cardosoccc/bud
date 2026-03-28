@@ -1,7 +1,7 @@
 """Database management commands."""
 import click
 
-from bud.commands.config_store import DB_PATH, set_config_value
+from bud.commands.config_store import get_db_path, set_config_value
 from bud.commands.db import get_engine, run_async
 from bud.commands.sync import push, pull
 from bud.schemas.project import ProjectCreate
@@ -25,7 +25,7 @@ def init():
         from sqlalchemy.ext.asyncio import AsyncSession
         from sqlalchemy.orm import sessionmaker
 
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        get_db_path().parent.mkdir(parents=True, exist_ok=True)
         engine = get_engine()
         async with engine.begin() as conn:
             from bud.database import Base
@@ -47,7 +47,7 @@ def init():
 
     project_id = run_async(_run())
     set_config_value("default_project_id", project_id)
-    click.echo(f"database initialized at {DB_PATH}")
+    click.echo(f"database initialized at {get_db_path()}")
 
 
 @db.command("migrate")
@@ -355,9 +355,9 @@ async def _deduplicate_recurrences(db):
 @click.confirmation_option(prompt="this will permanently delete the database. continue?")
 def destroy():
     """delete the database."""
-    if DB_PATH.exists():
-        DB_PATH.unlink()
-        click.echo(f"database deleted: {DB_PATH}")
+    if get_db_path().exists():
+        get_db_path().unlink()
+        click.echo(f"database deleted: {get_db_path()}")
     else:
         click.echo("database does not exist.")
 
@@ -366,15 +366,15 @@ def destroy():
 @click.confirmation_option(prompt="this will delete and recreate the database. continue?")
 def reset():
     """delete and recreate the database."""
-    if DB_PATH.exists():
-        DB_PATH.unlink()
-        click.echo(f"database deleted: {DB_PATH}")
+    if get_db_path().exists():
+        get_db_path().unlink()
+        click.echo(f"database deleted: {get_db_path()}")
 
     async def _run():
         from sqlalchemy.ext.asyncio import AsyncSession
         from sqlalchemy.orm import sessionmaker
 
-        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        get_db_path().parent.mkdir(parents=True, exist_ok=True)
         engine = get_engine()
         async with engine.begin() as conn:
             from bud.database import Base
@@ -392,5 +392,5 @@ def reset():
 
     project_id = run_async(_run())
     set_config_value("default_project_id", project_id)
-    click.echo(f"database initialized at {DB_PATH}")
+    click.echo(f"database initialized at {get_db_path()}")
     click.echo("database reset complete.")
