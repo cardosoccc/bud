@@ -1,3 +1,4 @@
+import pytest
 import pytest_asyncio
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -7,6 +8,12 @@ import bud.models  # noqa: F401 - registers all models with Base
 from bud.database import Base
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+
+@pytest.fixture(autouse=True)
+def isolate_bud_root(tmp_path, monkeypatch):
+    """Prevent tests from touching real ~/.bud/ directory."""
+    monkeypatch.setattr("bud.commands.config_store._BUD_ROOT", tmp_path)
 
 
 @pytest_asyncio.fixture
