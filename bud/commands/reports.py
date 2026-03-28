@@ -10,10 +10,10 @@ from bud.services import reports as report_service
 
 from bud.commands.table_format import format_table, _to_str, _render
 
-_T1_HEADERS = ["account", "calculated", "current", "difference"]
+_T1_HEADERS = ["account", "calculated", "current", "diff"]
 _T1_COL_TYPES = ["text", "num", "num", "num"]
 
-_T2_HEADERS = ["description", "category", "tags", "forecast", "current", "remaining"]
+_T2_HEADERS = ["description", "category", "tags", "forecast", "current", "diff"]
 _T2_COL_TYPES = ["text", "text", "tag", "num", "num", "num"]
 
 
