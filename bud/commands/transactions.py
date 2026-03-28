@@ -136,6 +136,8 @@ def create_transaction(value, description, txn_date, account_id, project_id, cat
                     return
 
                 forecasts = await forecast_service.list_forecasts(db, budget_obj.id)
+                from bud.commands.forecasts import _forecast_description
+                forecasts.sort(key=lambda f: 0 if _forecast_description(f) else 1)
                 if forecast_counter < 1 or forecast_counter > len(forecasts):
                     click.echo(f"forecast #{forecast_counter} not found in list.", err=True)
                     return

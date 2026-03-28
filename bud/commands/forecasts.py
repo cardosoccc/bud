@@ -356,6 +356,8 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, rec
                     bid = existing.id
                 items = await forecast_service.list_forecasts(db, bid)
                 items = _filtered_forecasts(items, filter_expr)
+                if items:
+                    items.sort(key=lambda f: 0 if _forecast_description(f) else 1)
                 if counter < 1 or counter > len(items):
                     click.echo(f"forecast #{counter} not found in list.", err=True)
                     return
@@ -493,6 +495,8 @@ def delete_forecast(forecast_id, budget_id, project_id, yes, filter_expr):
                     bid = existing.id
                 items = await forecast_service.list_forecasts(db, bid)
                 items = _filtered_forecasts(items, filter_expr)
+                if items:
+                    items.sort(key=lambda f: 0 if _forecast_description(f) else 1)
                 n = int(forecast_id)
                 if n < 1 or n > len(items):
                     click.echo(f"forecast #{n} not found in list.", err=True)
