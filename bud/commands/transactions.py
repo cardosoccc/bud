@@ -201,11 +201,12 @@ def create_transaction(value, description, txn_date, account_id, project_id, cat
 @click.option("--date", "-t", "txn_date", default=None)
 @click.option("--category", "-c", "category_id", default=None, help="category uuid or name")
 @click.option("--tags", default=None, help="comma-separated tags")
+@click.option("--move-month", "-m", "target_month", default=None, help="move transaction to this month (yyyy-mm)")
 @click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (counter references filtered list)")
 @click.argument("month", default=None, required=False)
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name (required when using counter)")
 @with_auto_push
-def edit_transaction(counter, record_id, value, description, txn_date, category_id, tags, filter_expr, month, project_id):
+def edit_transaction(counter, record_id, value, description, txn_date, category_id, tags, target_month, filter_expr, month, project_id):
     """edit a transaction. specify by list counter (default) or --id."""
     async def _run():
         async with get_session() as db:
@@ -228,6 +229,18 @@ def edit_transaction(counter, record_id, value, description, txn_date, category_
                 return
 
             d = date_type.fromisoformat(txn_date) if txn_date else None
+
+            if target_month:
+                import calendar
+                txn = await transaction_service.get_transaction(db, tid)
+                if not txn:
+                    click.echo("transaction not found.", err=True)
+                    return
+                year, month_num = map(int, target_month.split("-"))
+                last_day = calendar.monthrange(year, month_num)[1]
+                new_day = min(txn.date.day, last_day)
+                d = date_type(year, month_num, new_day)
+
             tag_list = [t.strip() for t in tags.split(",")] if tags else None
 
             cat = None

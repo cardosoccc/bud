@@ -35,3 +35,4 @@ class ForecastUpdate(BaseModel):
     value: Optional[Decimal] = None
     category_id: Optional[uuid.UUID] = None
     tags: Optional[List[str]] = None
+    budget_id: Optional[uuid.UUID] = None
