@@ -8,6 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from bud.models.budget import Budget
 from bud.models.forecast import Forecast
+from bud.models.recurrence import Recurrence
 from bud.models.transaction import Transaction
 from bud.schemas.forecast import ForecastCreate, ForecastUpdate
 
@@ -116,3 +117,60 @@ async def forecast_exists_for_recurrence(
         )
     )
     return result.scalar_one_or_none() is not None
+
+
+async def _get_forecast_for_recurrence_in_budget(
+    db: AsyncSession, recurrence_id: uuid.UUID, budget_id: uuid.UUID
+) -> Optional[Forecast]:
+    result = await db.execute(
+        select(Forecast).where(
+            Forecast.recurrence_id == recurrence_id,
+            Forecast.budget_id == budget_id,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def move_forecast(
+    db: AsyncSession,
+    forecast_id: uuid.UUID,
+    target_budget_id: uuid.UUID,
+    source_budget_name: str,
+) -> Optional[Forecast]:
+    """Move a forecast to a different budget, handling recurrence logic.
+
+    - Non-recurrent: simple budget_id update.
+    - Installment-based: detach from recurrence, set description to "desc (N/T) (month)".
+    - Simple recurrent: detach from recurrence, append source month to description.
+    """
+    forecast = await get_forecast(db, forecast_id)
+    if not forecast:
+        return None
+    if forecast.budget_id == target_budget_id:
+        return None
+
+    if forecast.recurrence_id:
+        rec_result = await db.execute(
+            select(Recurrence).where(Recurrence.id == forecast.recurrence_id)
+        )
+        rec_obj = rec_result.scalar_one_or_none()
+        base = rec_obj.base_description if rec_obj else forecast.description
+
+        if forecast.installment:
+            # Installment-based: detach and include installment info + source month
+            total = rec_obj.installments if rec_obj else None
+            inst_suffix = f"{forecast.installment}/{total}" if total else str(forecast.installment)
+            forecast.description = f"{base} ({inst_suffix}) ({source_budget_name})"
+        else:
+            # Simple recurrent: detach and append source month
+            forecast.description = f"{base} ({source_budget_name})"
+
+        forecast.recurrence_id = None
+        forecast.installment = None
+        forecast.budget_id = target_budget_id
+    else:
+        forecast.budget_id = target_budget_id
+
+    await db.commit()
+    await db.refresh(forecast)
+    return forecast

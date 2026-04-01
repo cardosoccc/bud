@@ -325,11 +325,12 @@ def create_forecast(budget_id, description, value, category_id, tags, recurrent,
 @click.option("--recurrent", "-r", is_flag=True, default=False, help="turn into a recurrent forecast")
 @click.option("--recurrence-end", "-e", default=None, help="last month for recurrence (yyyy-mm)")
 @click.option("--adjust", "-a", is_flag=True, default=False, help="set value to the current actual (matched transactions sum)")
+@click.option("--budget", "-b", "target_budget", default=None, help="move forecast to this budget (month name or uuid)")
 @click.option("--filter", "-f", "filter_expr", default=None, help="filter dsl (counter references filtered list)")
 @click.argument("budget_id", default=None, required=False)
 @click.option("--project", "-p", "project_id", default=None, help="project uuid or name")
 @with_auto_push
-def edit_forecast(counter, record_id, description, value, category_id, tags, recurrent, recurrence_end, adjust, filter_expr, budget_id, project_id):
+def edit_forecast(counter, record_id, description, value, category_id, tags, recurrent, recurrence_end, adjust, target_budget, filter_expr, budget_id, project_id):
     """edit a forecast. specify by list counter (default) or --id."""
     async def _run():
         tag_list = [t.strip() for t in tags.split(",")] if tags else None
@@ -364,6 +365,24 @@ def edit_forecast(counter, record_id, description, value, category_id, tags, rec
                 fid = items[counter - 1].id
             else:
                 click.echo("error: provide a counter or --id.", err=True)
+                return
+
+            if target_budget:
+                target_bid = await _resolve_or_create_budget_id(db, target_budget, project_id)
+                if not target_bid:
+                    return
+                forecast_obj = await forecast_service.get_forecast(db, fid)
+                if not forecast_obj:
+                    click.echo("forecast not found.", err=True)
+                    return
+                source_budget = await budget_service.get_budget(db, forecast_obj.budget_id)
+                result = await forecast_service.move_forecast(
+                    db, fid, target_bid, source_budget.name
+                )
+                if not result:
+                    click.echo("error: forecast not found or already in target budget.", err=True)
+                    return
+                click.echo(f"moved forecast to {target_budget}: {result.description}")
                 return
 
             if adjust:
