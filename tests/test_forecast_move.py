@@ -144,7 +144,7 @@ class TestMoveForecastService:
         assert result.description == "spotify (2026-04)"
         assert result.recurrence_id is None
 
-    async def test_move_installment_replaces_target(self, db_session):
+    async def test_move_installment_detaches_and_renames(self, db_session):
         p = await project_service.create_project(db_session, ProjectCreate(name="test"))
         b1 = await budget_service.create_budget(db_session, BudgetCreate(name="2026-04", project_id=p.id))
         b2 = await budget_service.create_budget(db_session, BudgetCreate(name="2026-05", project_id=p.id))
@@ -168,13 +168,16 @@ class TestMoveForecastService:
 
         assert result is not None
         assert result.budget_id == b2.id
-        assert result.installment == 1
-        assert result.recurrence_id == rec.id
+        assert result.description == "laptop (1/3) (2026-04)"
+        assert result.recurrence_id is None
+        assert result.installment is None
 
-        # The auto-populated forecast in target should be deleted
+        # The auto-populated forecast in target should remain untouched
         remaining = await forecast_service.list_forecasts(db_session, b2.id)
-        assert len(remaining) == 1
-        assert remaining[0].installment == 1
+        assert len(remaining) == 2
+        descs = {r.description for r in remaining}
+        assert "laptop (1/3) (2026-04)" in descs
+        assert "laptop" in descs
 
     async def test_move_to_same_budget_returns_none(self, db_session):
         p = await project_service.create_project(db_session, ProjectCreate(name="test"))

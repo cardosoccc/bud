@@ -140,7 +140,7 @@ async def move_forecast(
     """Move a forecast to a different budget, handling recurrence logic.
 
     - Non-recurrent: simple budget_id update.
-    - Installment-based: move and replace auto-populated forecast in target.
+    - Installment-based: detach from recurrence, set description to "desc (N/T) (month)".
     - Simple recurrent: detach from recurrence, append source month to description.
     """
     forecast = await get_forecast(db, forecast_id)
@@ -150,24 +150,24 @@ async def move_forecast(
         return None
 
     if forecast.recurrence_id:
+        rec_result = await db.execute(
+            select(Recurrence).where(Recurrence.id == forecast.recurrence_id)
+        )
+        rec_obj = rec_result.scalar_one_or_none()
+        base = rec_obj.base_description if rec_obj else forecast.description
+
         if forecast.installment:
-            # Installment-based: delete auto-populated forecast in target, move this one
-            existing = await _get_forecast_for_recurrence_in_budget(
-                db, forecast.recurrence_id, target_budget_id
-            )
-            if existing:
-                await db.delete(existing)
-            forecast.budget_id = target_budget_id
+            # Installment-based: detach and include installment info + source month
+            total = rec_obj.installments if rec_obj else None
+            inst_suffix = f"{forecast.installment}/{total}" if total else str(forecast.installment)
+            forecast.description = f"{base} ({inst_suffix}) ({source_budget_name})"
         else:
-            # Simple recurrent: detach and rename
-            rec_result = await db.execute(
-                select(Recurrence).where(Recurrence.id == forecast.recurrence_id)
-            )
-            rec_obj = rec_result.scalar_one_or_none()
-            base = rec_obj.base_description if rec_obj else forecast.description
+            # Simple recurrent: detach and append source month
             forecast.description = f"{base} ({source_budget_name})"
-            forecast.recurrence_id = None
-            forecast.budget_id = target_budget_id
+
+        forecast.recurrence_id = None
+        forecast.installment = None
+        forecast.budget_id = target_budget_id
     else:
         forecast.budget_id = target_budget_id
 
