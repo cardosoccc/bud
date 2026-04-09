@@ -176,7 +176,9 @@ async def _calculate_accumulated_remaining(
 
             # Get forecasts for this budget
             forecasts_result = await db.execute(
-                select(Forecast).where(Forecast.budget_id == b.id)
+                select(Forecast)
+                .where(Forecast.budget_id == b.id)
+                .options(selectinload(Forecast.recurrence))
             )
             budget_forecasts = list(forecasts_result.scalars().all())
 
