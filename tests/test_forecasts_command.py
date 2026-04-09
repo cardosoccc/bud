@@ -624,3 +624,90 @@ class TestEditAdjust:
 
         r = asyncio.run(_generate_report(cli_db, bid))
         assert r.forecasts[0].forecast_value == Decimal("-50")
+
+
+# ---------------------------------------------------------------------------
+# Installment description matching
+# ---------------------------------------------------------------------------
+
+class TestInstallmentMatchDescription:
+    """Unit tests for compute_forecast_actual with installment forecasts.
+
+    Verifies that a forecast for installment N does not cross-match a transaction
+    that belongs to a different installment (e.g. a moved forecast from a prior month).
+    """
+
+    def _make_forecast(self, base_desc, installment, total_installments):
+        """Return a mock Forecast linked to a Recurrence."""
+        from unittest.mock import MagicMock
+        rec = MagicMock()
+        rec.base_description = base_desc
+        rec.installments = total_installments
+        f = MagicMock()
+        f.description = base_desc
+        f.installment = installment
+        f.recurrence = rec
+        f.category_id = None
+        f.tags = None
+        return f
+
+    def _make_transaction(self, description, value=Decimal("-500")):
+        from unittest.mock import MagicMock
+        t = MagicMock()
+        t.description = description
+        t.category_id = None
+        t.tags = None
+        t.value = value
+        return t
+
+    def test_installment_forecast_does_not_match_different_installment_transaction(self):
+        """Installment-5 forecast must NOT match a moved installment-4 transaction."""
+        from bud.services.forecasts import compute_forecast_actual
+        f = self._make_forecast("autoglass", installment=5, total_installments=9)
+        txn = self._make_transaction("autoglass (4/9) (2026-03)")
+        assert compute_forecast_actual(f, [txn]) == Decimal("0")
+
+    def test_installment_forecast_matches_same_installment_transaction(self):
+        """Installment-5 forecast MUST match a transaction containing '(5/9)'."""
+        from bud.services.forecasts import compute_forecast_actual
+        f = self._make_forecast("autoglass", installment=5, total_installments=9)
+        txn = self._make_transaction("autoglass (5/9)")
+        assert compute_forecast_actual(f, [txn]) == Decimal("-500")
+
+    def test_installment_forecast_no_total_uses_bare_number(self):
+        """When recurrence.installments is None, match string is 'base (N)'."""
+        from bud.services.forecasts import compute_forecast_actual
+        f = self._make_forecast("autoglass", installment=5, total_installments=None)
+        matching = self._make_transaction("autoglass (5)")
+        non_matching = self._make_transaction("autoglass (4)")
+        assert compute_forecast_actual(f, [matching]) == Decimal("-500")
+        assert compute_forecast_actual(f, [non_matching]) == Decimal("0")
+
+    def test_non_installment_recurrent_forecast_uses_bare_description(self):
+        """A recurrent forecast with no installment still matches by bare description."""
+        from unittest.mock import MagicMock
+        from bud.services.forecasts import compute_forecast_actual
+        rec = MagicMock()
+        rec.base_description = "rent"
+        rec.installments = None
+        f = MagicMock()
+        f.description = "rent"
+        f.installment = None
+        f.recurrence = rec
+        f.category_id = None
+        f.tags = None
+        txn = self._make_transaction("rent april")
+        assert compute_forecast_actual(f, [txn]) == Decimal("-500")
+
+    def test_non_recurrent_forecast_uses_stored_description(self):
+        """A forecast with no recurrence matches by its stored description as before."""
+        from unittest.mock import MagicMock
+        from bud.services.forecasts import compute_forecast_actual
+        f = MagicMock()
+        f.description = "autoglass (4/9) (2026-03)"
+        f.installment = None
+        f.recurrence = None
+        f.category_id = None
+        f.tags = None
+        txn = self._make_transaction("autoglass (4/9) (2026-03)")
+        assert compute_forecast_actual(f, [txn]) == Decimal("-500")

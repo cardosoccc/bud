@@ -64,6 +64,21 @@ async def delete_forecast(db: AsyncSession, forecast_id: uuid.UUID) -> bool:
     return True
 
 
+def _effective_match_description(forecast: Forecast) -> str | None:
+    """Return the description string to use when matching transactions.
+
+    For installment forecasts linked to a recurrence, includes the (N/total)
+    suffix so that installment 5 only matches transactions containing "(5/9)",
+    not transactions for other installment numbers (e.g. moved "(4/9) (2026-03)").
+    """
+    if forecast.installment is not None and forecast.recurrence is not None:
+        base = forecast.recurrence.base_description or forecast.description
+        total = forecast.recurrence.installments
+        suffix = f"{forecast.installment}/{total}" if total else str(forecast.installment)
+        return f"{base} ({suffix})"
+    return forecast.description
+
+
 def compute_forecast_actual(forecast: Forecast, transactions: list) -> Decimal:
     """Compute the actual (current) value for a forecast by matching transactions.
 
@@ -76,11 +91,12 @@ def compute_forecast_actual(forecast: Forecast, transactions: list) -> Decimal:
     if not has_criteria:
         return Decimal("0")
 
+    match_desc = _effective_match_description(forecast)
     actual = Decimal("0")
     for t in transactions:
         if forecast.category_id and t.category_id != forecast.category_id:
             continue
-        if forecast.description and forecast.description.lower() not in t.description.lower():
+        if match_desc and match_desc.lower() not in t.description.lower():
             continue
         if forecast.tags and not all(tag in (t.tags or []) for tag in forecast.tags):
             continue
