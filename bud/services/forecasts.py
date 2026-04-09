@@ -87,11 +87,10 @@ def compute_forecast_actual(forecast: Forecast, transactions: list) -> Decimal:
     - description: case-insensitive substring match
     - tags: all forecast tags must be present in the transaction
     """
-    has_criteria = forecast.description or forecast.category_id or forecast.tags
+    match_desc = _effective_match_description(forecast)
+    has_criteria = match_desc or forecast.category_id or forecast.tags
     if not has_criteria:
         return Decimal("0")
-
-    match_desc = _effective_match_description(forecast)
     actual = Decimal("0")
     for t in transactions:
         if forecast.category_id and t.category_id != forecast.category_id:
